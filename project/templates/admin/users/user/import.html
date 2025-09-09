@@ -1,0 +1,11 @@
+{% block content %}
+  <h1>{{ title }}</h1>
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <p>{{ form.file.label_tag }} {{ form.file }}</p>
+    <p>{{ form.dry_run }} {{ form.dry_run.label_tag }}</p>
+    <button type="submit" class="default">อัปโหลด</button>
+    <a href="{% url 'admin:users_user_changelist' %}" class="button">ยกเลิก</a>
+  </form>
+  <p>รูปแบบหัวตารางที่รองรับ: <code>email,password,name,role</code></p>
+{% endblock %}

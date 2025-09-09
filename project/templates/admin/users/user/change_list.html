@@ -1,0 +1,16 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  <li>
+    <form action="{% url 'admin:users_user_import' %}" method="post" enctype="multipart/form-data" style="display:inline-flex; gap:.5rem; align-items:center;">
+      {% csrf_token %}
+      <input type="file" name="file" accept=".xlsx,.csv" required>
+      <label style="font-weight:normal;">
+        <input type="checkbox" name="dry_run"> ทดลองก่อน
+      </label>
+      <button type="submit" class="button">Import</button>
+    </form>
+  </li>
+{% endblock %}
+

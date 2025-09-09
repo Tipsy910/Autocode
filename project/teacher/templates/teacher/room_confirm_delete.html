@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">ยืนยันการลบห้องเรียน</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">คุณแน่ใจหรือไม่ว่าต้องการลบห้องเรียน:</p>
+                    <h3 class="text-center my-4">"{{ object.name }}"</h3>
+                    <p class="text-danger"><strong>คำเตือน:</strong> การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลทั้งหมดในห้องเรียนนี้จะถูกลบอย่างถาวร</p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end mt-4">
+                            <a href="{% url 'room:teacher_detail' object.pk %}" class="btn btn-secondary me-2">ยกเลิก</a>
+                            <button type="submit" class="btn btn-danger">ใช่, ยืนยันการลบ</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

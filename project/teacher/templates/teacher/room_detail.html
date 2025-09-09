@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title|default:"รายละเอียดห้องเรียน" }}{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="card-title mb-1">ห้องเรียน: {{ room.name }}</h2>
+                    <h6 class="card-subtitle text-muted">รหัสสำหรับเข้าร่วม: 
+                        <span class="badge bg-secondary font-monospace">{{ room.invite_code }}</span>
+                    </h6>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteRoomModal">
+                        <i class="bi bi-trash-fill"></i> ลบห้องเรียน
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editRoomModal">
+                        <i class="bi bi-pencil-square"></i> แก้ไขข้อมูลห้อง
+                    </button>
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" id="roomTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button" role="tab" aria-controls="assignments" aria-selected="true">งานที่สั่ง</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab" aria-controls="students" aria-selected="false">
+                        นักเรียน <span class="badge rounded-pill bg-info text-dark">{{ students_in_room.count }}</span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content" id="roomTabsContent">
+                <div class="tab-pane fade show active" id="assignments" role="tabpanel" aria-labelledby="assignments-tab">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">รายการงาน</h4>
+                        <a href="#" class="btn btn-primary">
+                            <i class="bi bi-plus-lg"></i> สร้างงานใหม่
+                        </a>
+                    </div>
+                    <p class="text-muted">-- ส่วนนี้สำหรับแสดงรายการ Assignment --</p>
+                </div>
+
+                <div class="tab-pane fade" id="students" role="tabpanel" aria-labelledby="students-tab">
+                    <h4 class="mb-3">รายชื่อนักเรียนในห้อง</h4>
+                    {% if students_in_room %}
+                        <ul class="list-group">
+                            {% for student_profile in students_in_room %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ student_profile.user.get_full_name|default:student_profile.user.email }}
+                                <span class="text-muted font-monospace small">
+                                    ID: {{ student_profile.user.personal_id|default:"N/A" }}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="alert alert-info">ยังไม่มีนักเรียนเข้าร่วมในห้องนี้</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{% url 'teacher:dashboard' %}" class="btn btn-outline-secondary">&laquo; กลับไปหน้า Dashboard</a>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-labelledby="deleteRoomModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="deleteRoomModalLabel">ยืนยันการลบห้องเรียน</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>คุณแน่ใจหรือไม่ว่าต้องการลบห้องเรียน <strong>"{{ room.name }}"</strong>?</p>
+        <p class="text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+        <form action="#" method="post" class="d-inline"> {# action="{% url 'teacher:room_delete' room.pk %}" #}
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">ยืนยันการลบ</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="editRoomModal" tabindex="-1" aria-labelledby="editRoomModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="editRoomModalLabel">แก้ไขข้อมูลห้อง: {{ room.name }}</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            
+            <div class="mb-3">
+                <label for="{{ edit_form.name.id_for_label }}" class="form-label">ชื่อห้อง:</label>
+                <input type="text" 
+                       name="{{ edit_form.name.name }}" 
+                       value="{{ edit_form.name.value|default:'' }}"
+                       id="{{ edit_form.name.id_for_label }}" 
+                       class="form-control">
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ edit_form.cover_image.id_for_label }}" class="form-label">เปลี่ยนรูปปกห้องเรียน:</label>
+                
+                {% if room.cover_image %}
+                    <p class="mb-1 text-muted"><small>รูปปัจจุบัน:</small></p>
+                    <img src="{{ room.cover_image.url }}" alt="Current cover" class="img-thumbnail mb-2" width="150">
+                {% endif %}
+                
+                <input type="file" 
+                       name="{{ edit_form.cover_image.name }}" 
+                       accept="image/*"
+                       id="{{ edit_form.cover_image.id_for_label }}"
+                       class="form-control">
+                <div class="form-text">หากไม่ต้องการเปลี่ยนรูปภาพ ไม่ต้องเลือกไฟล์ใหม่</div>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึกการเปลี่ยนแปลง</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

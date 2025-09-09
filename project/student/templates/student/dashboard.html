@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}แดชบอร์ดนักเรียน{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">ห้องเรียนของฉัน</h3>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#joinRoomModal">
+            <i class="bi bi-plus-circle-fill me-2"></i>เข้าร่วมห้องเรียนใหม่
+        </button>
+    </div>
+
+    {% if joined_rooms %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for room in joined_rooms %}
+                <div class="col">
+                    <a href="{% url 'student_room_detail' room.id %}" class="card-link text-decoration-none">
+                        <div class="card h-100 shadow-sm room-card">
+                            {% if room.cover_image %}
+                                <img src="{{ room.cover_image.url }}" class="card-img-top" alt="ปกห้อง {{ room.name }}" style="height: 150px; object-fit: cover;">
+                            {% else %}
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light text-secondary" style="height: 150px;">
+                                    <i class="bi bi-image-alt" style="font-size: 3rem;"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">{{ room.name }}</h5>
+                                <p class="card-text text-muted">สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">คุณยังไม่ได้เข้าร่วมห้องเรียนใดๆ ลองใช้รหัสเชิญเพื่อเข้าร่วมห้องเรียนแรกของคุณ!</div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="joinRoomModal" tabindex="-1" aria-labelledby="joinRoomModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="joinRoomModalLabel">เข้าร่วมห้องเรียนด้วยรหัส</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <p>กรุณากรอกรหัสเชิญ (Invite Code) ที่ได้รับจากอาจารย์ผู้สอน</p>
+            <div class="mb-3">
+                <label for="{{ form.invite_code.id_for_label }}" class="form-label">รหัสเชิญ:</label>
+                <input type="text" 
+                       name="{{ form.invite_code.name }}" 
+                       id="{{ form.invite_code.id_for_label }}"
+                       class="form-control {% if form.invite_code.errors %}is-invalid{% endif %}"
+                       placeholder="กรอกรหัส 6 หลักที่นี่">
+
+                {% if form.invite_code.errors %}
+                    <div class="invalid-feedback">
+                        {% for error in form.invite_code.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">ยืนยันการเข้าร่วม</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<style>
+    .room-card {
+        transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
+    }
+    .room-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+</style>
+{% endblock %}
