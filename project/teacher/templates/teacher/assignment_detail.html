@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ assignment.title }} - {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
+        <h1 class="display-6"><i class="fas fa-clipboard-list me-3"></i>{{ assignment.title }}</h1>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-secondary me-3 fs-6">
+            {{ assignment.score|floatformat:0 }} คะแนน
+            </span>
+            <a href="{% url 'teacher:assignment_edit' pk=assignment.pk %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit me-2"></i>แก้ไข
+            </a>
+            <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteAssignmentModal">
+                <i class="fas fa-trash-alt me-2"></i>ลบ
+            </a>
+        </div>
+    </div>
+    
+    <div class="row g-5">
+        <div class="col-md-8">
+            <h4 class="mb-3">การส่งงานของนักเรียน</h4>
+            <div class="list-group">
+                {% for item in student_submissions %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-user-graduate me-2 text-muted"></i>
+                            {{ item.student.user.get_full_name|default:item.student.user.username }}
+                        </div>
+                        
+                        {# ตรวจสอบสถานะการส่งงาน #}
+                        {% if item.submission %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-check-circle me-1"></i>ส่งแล้ว
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-times-circle me-1"></i>ยังไม่ส่ง
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    {# ถ้ามีการส่งงานแล้ว ให้แสดงรายละเอียดเพิ่มเติม #}
+                    {% if item.submission %}
+                    <div class="mt-2 ps-4 border-start">
+                        <p class="mb-1 small text-muted">
+                            ส่งเมื่อ: {{ item.submission.submitted_at|date:"d M Y, H:i" }}
+                        </p>
+                        <p class="mb-0">
+                            <a href="{{ item.submission.submitted_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-file-alt me-2"></i>ดูไฟล์ที่ส่ง
+                            </a>
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="list-group-item text-center text-muted">
+                    ยังไม่มีนักเรียนในห้องนี้
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    รายละเอียดงาน
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">กำหนดส่ง</h5>
+                    <p class="card-text">
+                        {% if assignment.due_date %}
+                            {{ assignment.due_date|date:"l, d F Y, P" }}
+                        {% else %}
+                            ไม่มีกำหนดส่ง
+                        {% endif %}
+                    </p>
+                    <hr>
+                    <h5 class="card-title">คำอธิบาย</h5>
+                    <p class="card-text">
+                        {{ assignment.description|linebreaksbr|default:"ไม่มีคำอธิบาย" }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<!-- Modal สำหรับยืนยันการลบงาน -->
+ <div class="modal fade" id="deleteAssignmentModal" tabindex="-1" aria-labelledby="deleteAssignmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAssignmentModalLabel">ยืนยันการลบงาน</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>คุณแน่ใจหรือไม่ว่าต้องการลบงานชิ้นนี้</p>
+                <p class="fw-bold">"{{ assignment.title }}"?</p>
+                <p class="text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้ และข้อมูลการส่งงานของนักเรียนทั้งหมดจะถูกลบไปด้วย</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                
+                <form action="{% url 'teacher:assignment_delete' pk=assignment.pk %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">ยืนยันการลบ</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

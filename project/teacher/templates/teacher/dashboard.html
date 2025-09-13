@@ -1,37 +1,51 @@
 {% extends 'base.html' %}
-{% load static %} {% block content %}
+{% load static %} 
+
+{% block content %}
 <div class="container my-4">
     <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h3 class="mb-0">ห้องเรียนของฉัน</h3>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoomModal">
-                <i class="bi bi-plus-lg"></i> สร้างห้องเรียนใหม่
-            </button>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap py-3">
+            <h3 class="mb-0 me-3">ห้องเรียนของฉัน</h3>
+            <div class="d-flex">
+                <button type="button" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#joinRoomModal">
+                    <i class="fas fa-sign-in-alt me-2"></i>เข้าร่วมห้องเรียน
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoomModal">
+                    <i class="fas fa-plus me-2"></i>สร้างห้องเรียนใหม่
+                </button>
+            </div>
         </div>
         <div class="card-body">
             {% if all_rooms %}
                 <div class="list-group">
-                    
                     {% for room in all_rooms %}
                         <a href="{% url 'room:teacher_detail' room.pk %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
                             {% if room.cover_image %}
                                 <img src="{{ room.cover_image.url }}" alt="{{ room.name }}" class="rounded me-3" style="width: 100px; height: 75px; object-fit: cover;">
                             {% else %}
                                 <div class="bg-light border rounded me-3 d-flex align-items-center justify-content-center text-muted" style="width: 100px; height: 75px; font-size: 1.5rem;">
-                                    <i class="bi bi-image"></i>
+                                    <i class="fas fa-image"></i>
                                 </div>
                             {% endif %}
                             
                             <div class="flex-grow-1">
                                 <h5 class="mb-1">{{ room.name }}</h5>
-                                <small class="text-muted">รหัสเชิญ: {{ room.invite_code }}</small>
+                                <small class="text-muted d-block">รหัสเชิญ: {{ room.invite_code }}</small>
+                            </div>
+
+                            <div>
+                                {% if room.owner == request.user %}
+                                    <span class="badge bg-primary">เจ้าของ</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">ผู้สอนร่วม</span>
+                                {% endif %}
                             </div>
                         </a>
                     {% endfor %}
-                    </div>
+                </div>
             {% else %}
                 <div class="alert alert-info mb-0" role="alert">
-                    คุณยังไม่มีห้องเรียนที่สร้างไว้ คลิก "สร้างห้องเรียนใหม่" เพื่อเริ่มได้เลย!
+                    คุณยังไม่มีห้องเรียนที่สร้างหรือเข้าร่วมไว้ คลิก "สร้างห้องเรียนใหม่" หรือ "เข้าร่วมห้องเรียน" เพื่อเริ่มได้เลย!
                 </div>
             {% endif %}
         </div>
@@ -39,53 +53,73 @@
 </div>
 
 <div class="modal fade" id="createRoomModal" tabindex="-1" aria-labelledby="createRoomModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-
-      <form action="{% url 'teacher:dashboard' %}" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="modal-header">
-          <h1 class="modal-title fs-5" id="createRoomModalLabel">สร้างห้องเรียนใหม่</h1>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <div class="mb-3">
-                <label for="{{ form.name.id_for_label }}" class="form-label">Name:</label>
-                <input type="text" 
-                       name="{{ form.name.name }}" 
-                       id="{{ form.name.id_for_label }}" 
-                       class="form-control {% if form.name.errors %}is-invalid{% endif %}"
-                       placeholder="เช่น ห้องเรียนวิทยาศาสตร์ ม.4/1"
-                       required>
-                {% if form.name.errors %}
-                    <div class="invalid-feedback">
-                        {% for error in form.name.errors %}{{ error }}{% endfor %}
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{% url 'teacher:dashboard' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="createRoomModalLabel">สร้างห้องเรียนใหม่</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="{{ create_form.name.id_for_label }}" class="form-label">ชื่อห้องเรียน:</label>
+                        <input type="text" 
+                               name="{{ create_form.name.name }}" 
+                               id="{{ create_form.name.id_for_label }}" 
+                               class="form-control {% if create_form.name.errors %}is-invalid{% endif %}"
+                               placeholder="เช่น ห้องเรียนวิทยาศาสตร์ ม.4/1"
+                               required>
+                        {% for error in create_form.name.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
                     </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="{{ form.cover_image.id_for_label }}" class="form-label">รูปปกห้องเรียน (ถ้ามี):</label>
-                <input type="file" 
-                       name="{{ form.cover_image.name }}" 
-                       accept="image/*"
-                       id="{{ form.cover_image.id_for_label }}"
-                       class="form-control {% if form.cover_image.errors %}is-invalid{% endif %}">
-                {% if form.cover_image.errors %}
-                    <div class="invalid-feedback">
-                        {% for error in form.cover_image.errors %}{{ error }}{% endfor %}
+                    <div class="mb-3">
+                        <label for="{{ create_form.cover_image.id_for_label }}" class="form-label">รูปปกห้องเรียน (ถ้ามี):</label>
+                        <input type="file" 
+                               name="{{ create_form.cover_image.name }}" 
+                               accept="image/*"
+                               id="{{ create_form.cover_image.id_for_label }}"
+                               class="form-control {% if create_form.cover_image.errors %}is-invalid{% endif %}">
+                        {% for error in create_form.cover_image.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
                     </div>
-                {% endif %}
-            </div>
-
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" name="action" value="create_room">ยืนยันและสร้างห้อง</button>
+                </div>
+            </form>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-          <button type="submit" class="btn btn-primary">ยืนยันและสร้างห้อง</button>
-        </div>
-      </form>
     </div>
-  </div>
 </div>
-<a href="{% url 'logout' %}">Logout</a>
+
+<div class="modal fade" id="joinRoomModal" tabindex="-1" aria-labelledby="joinRoomModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'teacher:dashboard' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="joinRoomModalLabel">เข้าร่วมห้องเรียน</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>กรุณากรอกรหัสเชิญ (Invite Code) ที่ได้รับจากผู้สอน</p>
+                    <div class="mb-3">
+                        <label for="{{ join_form.code.id_for_label }}" class="form-label">{{ join_form.code.label }}</label>
+                        <input type="text" name="{{ join_form.code.name }}" class="form-control {% if join_form.code.errors %}is-invalid{% endif %}" id="{{ join_form.code.id_for_label }}" maxlength="6" style="text-transform:uppercase">
+                        {% for error in join_form.code.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" name="action" value="join_room">เข้าร่วม</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

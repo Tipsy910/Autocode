@@ -28,9 +28,14 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
-# In your app's models.py
 
-# from rooms.models import Room
+
+class SubmissionType(models.Model):
+    name = models.CharField(max_length=100, help_text="ชื่อที่แสดงผล เช่น 'ไฟล์ Python', 'Google Colab Link'")
+    identifier = models.CharField(max_length=10, unique=True, help_text="ชื่อเฉพาะสำหรับอ้างอิงในโค้ด เช่น 'PY', 'URL', 'IPYNB'")
+
+    def __str__(self):
+        return self.name
 
 class Assignment(models.Model):
     """
@@ -41,6 +46,7 @@ class Assignment(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     due_date = models.DateTimeField(blank=True, null=True)
+    score = models.FloatField(blank=True, null=True)
 
     # --- ส่วนตั้งค่าสำหรับ AI Quiz Generation ---
     test_case_file = models.FileField(
@@ -54,30 +60,66 @@ class Assignment(models.Model):
         default=4, help_text="จำนวนตัวเลือกในแต่ละคำถาม"
     )
     # -----------------------------------------
+    allowed_submission_types = models.ManyToManyField(
+        SubmissionType, 
+        related_name='assignments',
+        blank=True,
+        help_text="เลือกประเภทไฟล์ที่อนุญาตให้นักเรียนส่งสำหรับงานชิ้นนี้"
+    )
+    
+    author = models.ForeignKey(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.SET_NULL,
+    null=True,
+    related_name='created_assignments')
+
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
 
+
 class Submission(models.Model):
     assignment = models.ForeignKey('room.Assignment', on_delete=models.CASCADE, related_name='submissions')
-    
-    # --- จุดที่ต้องตรวจสอบ ---
     student = models.ForeignKey(
-        settings.AUTH_USER_MODEL,  # <-- ต้องเป็นแบบนี้เท่านั้น ห้ามเป็น User โดยตรง
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='submissions'
     )
-    # -----------------------
-
-    submitted_file = models.FileField(upload_to='submissions/files/')
     submitted_at = models.DateTimeField(auto_now_add=True)
+    
+    # --- ส่วนที่เปลี่ยนแปลงและเพิ่มเข้ามา ---
+    
+    # 1. ระบุประเภทของการส่งงานครั้งนี้
+    submission_type = models.ForeignKey(
+        SubmissionType, 
+        on_delete=models.PROTECT, # ป้องกันการลบประเภทไฟล์ที่มีการส่งงานแล้ว
+        related_name='submissions',
+        null=True, # ตั้งเป็น null=True เพื่อให้ migration ผ่านได้ง่ายสำหรับข้อมูลเก่า
+        blank=True
+    )
+
+    # 2. แก้ไข field เดิมให้สามารถเว้นว่างได้
+    submitted_file = models.FileField(
+        upload_to='submissions/files/',
+        blank=True, 
+        null=True
+    )
+    
+    # 3. เพิ่ม field ใหม่สำหรับเก็บลิงก์
+    submitted_link = models.URLField(
+        max_length=500, # เผื่อสำหรับ URL ยาวๆ
+        blank=True,
+        null=True
+    )
+
+    # ----------------------------------------
+    
     quiz_generated = models.BooleanField(default=False)
 
     def __str__(self):
-        # การเข้าถึง field ของ User model ต้องทำผ่าน self.student
-        return f'Submission by {self.student.email} for {self.assignment.title}'
+        return f'Submission by {self.student.username} for {self.assignment.title}'
 
 # --- โมเดลสำหรับควิซที่ AI สร้างขึ้นมาโดยเฉพาะ ---
 
@@ -109,3 +151,39 @@ class GeneratedChoice(models.Model):
     """
     question = models.ForeignKey(GeneratedQuestion, on_delete=models.CASCADE, related_name='choices')
     choice_text = models.TextField()
+    
+
+class Announcement(models.Model):
+    """
+    โมเดลสำหรับเก็บประกาศ 1 ชิ้น
+    """
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='announcements')
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='announcements'
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at'] # เรียงจากใหม่สุดไปเก่าสุดเสมอ
+
+    def __str__(self):
+        return f"Announcement in {self.room.name} by {self.author.email}"
+
+class AnnouncementFile(models.Model):
+    """
+    โมเดลสำหรับเก็บไฟล์ 1 ไฟล์ ที่แนบไปกับประกาศ
+    """
+    announcement = models.ForeignKey(
+        Announcement, 
+        on_delete=models.CASCADE, 
+        related_name='files' # <-- ทำให้เราเรียก .files.all() จาก announcement ได้
+    )
+    file = models.FileField(upload_to='announcements/files/')
+
+    def __str__(self):
+        # ดึงชื่อไฟล์จาก path
+        return self.file.name.split('/')[-1]
