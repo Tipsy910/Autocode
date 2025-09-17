@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from users.models import Students
 from room.models import Room
 from .forms import JoinRoomForm
-from room.models import Room, Assignment
+from room.models import Room, Assignment, Announcement, Submission
 
 @method_decorator(login_required, name='dispatch')
 class student_dashboard(View):
@@ -46,17 +46,50 @@ class student_dashboard(View):
             'form': form, # form ที่มี error message จะถูกส่งกลับไป
         }
         return render(request, self.template_name, context)
-def student_room_detail_view(request, room_id):
 
-    room = get_object_or_404(Room, id=room_id, students__user=request.user)
+@login_required
+def student_room_detail_view(request, pk):
+    # ดึงข้อมูลห้องเรียน
+    room = get_object_or_404(Room, pk=pk)
 
-    assignments = Assignment.objects.filter(room=room).order_by('-due_date')
-    
+    # ตรวจสอบสิทธิ์: นักเรียนต้องเป็นสมาชิกของห้องนี้เท่านั้น
+    try:
+        student_profile = request.user.student_profile
+        if not room.students.filter(pk=student_profile.pk).exists():
+            # ถ้าไม่ได้เป็นสมาชิก ให้ redirect หรือแสดงข้อผิดพลาด
+            return redirect('student:dashboard') # กลับไปหน้า dashboard ของนักเรียน
+    except AttributeError:
+        # กรณี User ไม่มี student_profile
+        return redirect('student:dashboard')
+
+    # ดึงข้อมูลประกาศและงานทั้งหมดในห้อง
+    announcements = Announcement.objects.filter(room=room)
+    assignments = Assignment.objects.filter(room=room).order_by('-created_at')
+
+    # --- ส่วนสำคัญ: คำนวณสถานะการส่งงานของนักเรียนคนนี้ ---
+    # ดึงงานทุกชิ้นที่นักเรียนคนนี้เคยส่งในห้องนี้
+    student_submissions = Submission.objects.filter(
+        student=request.user, 
+        assignment__in=assignments
+    )
+    # สร้าง map เพื่อให้ค้นหาได้เร็วขึ้น
+    submission_map = {submission.assignment.id: submission for submission in student_submissions}
+
+    for assignment in assignments:
+        submission = submission_map.get(assignment.id)
+        if submission:
+            # TODO: ในอนาคตสามารถเช็คสถานะการตรวจ (Graded) ได้ที่นี่
+            assignment.submission_status = 'SUBMITTED'
+        else:
+            assignment.submission_status = 'NOT_SUBMITTED'
+    # --- จบส่วนคำนวณสถานะ ---
+
     context = {
         'room': room,
-        'assignments': assignments, # <--- ส่งรายการงานไปที่ template
-        'page_title': f"เข้าห้องเรียน: {room.name}",
+        'announcements': announcements,
+        'assignments': assignments,
     }
+
     return render(request, 'student/room_detail.html', context)
 
 def student_assignment_detail_view(request, assignment_id):

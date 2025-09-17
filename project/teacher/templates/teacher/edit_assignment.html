@@ -3,7 +3,7 @@
 {% block title %}แก้ไขงาน: {{ assignment.title }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container mt-4 mb-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
@@ -13,47 +13,80 @@
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data" action="">
                         {% csrf_token %}
-                        
-                        {# โค้ดส่วนที่แสดงฟอร์มทั้งหมดสามารถคัดลอกมาจาก create_assignment.html ได้เลย #}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                            </div>
+                        {% endif %}
+
                         <div class="mb-3">
                             <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}</label>
-                            {{ form.title }}
+                            <input type="text" name="{{ form.title.name }}" value="{{ form.title.value|default:'' }}" class="form-control {% if form.title.errors %}is-invalid{% endif %}" id="{{ form.title.id_for_label }}">
+                            <div class="invalid-feedback">{{ form.title.errors|striptags }}</div>
                         </div>
+
                         <div class="mb-3">
                             <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
-                            {{ form.description }}
+                            <textarea name="{{ form.description.name }}" class="form-control" rows="4" id="{{ form.description.id_for_label }}">{{ form.description.value|default:'' }}</textarea>
                         </div>
+                        
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.due_date.id_for_label }}" class="form-label">{{ form.due_date.label }}</label>
-                                {{ form.due_date }}
+                                <input type="datetime-local" name="{{ form.due_date.name }}" value="{{ form.due_date.value|date:'Y-m-d\TH:i' }}" class="form-control {% if form.due_date.errors %}is-invalid{% endif %}" id="{{ form.due_date.id_for_label }}">
+                                <div class="invalid-feedback">{{ form.due_date.errors|striptags }}</div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.score.id_for_label }}" class="form-label">{{ form.score.label }}</label>
-                                {{ form.score }}
+                                <input type="number" name="{{ form.score.name }}" value="{{ form.score.value|default:'' }}" class="form-control {% if form.score.errors %}is-invalid{% endif %}" id="{{ form.score.id_for_label }}" min="0">
+                                <div class="invalid-feedback">{{ form.score.errors|striptags }}</div>
                             </div>
                         </div>
+
                         <div class="mb-3">
                             <label class="form-label">{{ form.allowed_submission_types.label }}</label>
+                            {% if form.allowed_submission_types.errors %}<div class="alert alert-danger py-1">{{ form.allowed_submission_types.errors|striptags }}</div>{% endif %}
                             <div class="border rounded p-2">
                                 {% for checkbox in form.allowed_submission_types %}
-                                    <div class="form-check">
-                                        {{ checkbox.tag }}
-                                        <label class="form-check-label" for="{{ checkbox.id_for_label }}">
-                                            {{ checkbox.choice_label }}
-                                        </label>
-                                    </div>
+                                <div class="form-check">
+                                    {{ checkbox.tag }}
+                                    <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                                </div>
                                 {% endfor %}
                             </div>
-                             <div class="form-text">{{ form.allowed_submission_types.help_text }}</div>
+                            <div class="form-text">{{ form.allowed_submission_types.help_text }}</div>
                         </div>
+                        
                         <hr>
                         <h5 class="mb-3">ตั้งค่าสำหรับ AI Quiz Generation</h5>
+
+                        <div class="mb-3">
+                            <label for="{{ form.test_case_file.id_for_label }}" class="form-label">{{ form.test_case_file.label }}</label>
+                            {{ form.test_case_file }} {# Widget ของ FileField แสดงผลได้ดีในตัว #}
+                            {% if form.test_case_file.errors %}
+                                <div class="text-danger small mt-1">{{ form.test_case_file.errors|striptags }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.test_case_file.help_text }}</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.quiz_question_count.id_for_label }}" class="form-label">{{ form.quiz_question_count.label }}</label>
+                                <input type="number" name="{{ form.quiz_question_count.name }}" value="{{ form.quiz_question_count.value|default:'' }}" class="form-control {% if form.quiz_question_count.errors %}is-invalid{% endif %}" id="{{ form.quiz_question_count.id_for_label }}" min="1">
+                                <div class="invalid-feedback">{{ form.quiz_question_count.errors|striptags }}</div>
+                                <div class="form-text">{{ form.quiz_question_count.help_text }}</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.quiz_choice_count.id_for_label }}" class="form-label">{{ form.quiz_choice_count.label }}</label>
+                                <input type="number" name="{{ form.quiz_choice_count.name }}" value="{{ form.quiz_choice_count.value|default:'' }}" class="form-control {% if form.quiz_choice_count.errors %}is-invalid{% endif %}" id="{{ form.quiz_choice_count.id_for_label }}" min="2">
+                                <div class="invalid-feedback">{{ form.quiz_choice_count.errors|striptags }}</div>
+                                <div class="form-text">{{ form.quiz_choice_count.help_text }}</div>
+                            </div>
+                        </div>
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                             <a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}" class="btn btn-secondary me-md-2">ยกเลิก</a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i>บันทึกการเปลี่ยนแปลง
-                            </button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>บันทึกการเปลี่ยนแปลง</button>
                         </div>
                     </form>
                 </div>

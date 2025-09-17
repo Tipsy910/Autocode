@@ -15,7 +15,7 @@
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {% for room in joined_rooms %}
                 <div class="col">
-                    <a href="{% url 'student_room_detail' room.id %}" class="card-link text-decoration-none">
+                    <a href="{% url 'student:room_detail' room.id %}" class="card-link text-decoration-none">
                         <div class="card h-100 shadow-sm room-card">
                             {% if room.cover_image %}
                                 <img src="{{ room.cover_image.url }}" class="card-img-top" alt="ปกห้อง {{ room.name }}" style="height: 150px; object-fit: cover;">

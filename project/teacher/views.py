@@ -336,18 +336,13 @@ class AssignmentDeleteView(LoginRequiredMixin, DeleteView):
         room_pk = self.object.room.pk
         return reverse('room:teacher_detail', kwargs={'pk': room_pk})
 
-# teacher/views.py
-
 @login_required
 def edit_assignment(request, pk):
     assignment = get_object_or_404(Assignment, pk=pk)
-    
-    # --- ส่วนที่แก้ไข: ตรวจสอบสิทธิ์การแก้ไข ---
+
     if assignment.author != request.user:
-        # ถ้าไม่ใช่ผู้สร้างงานชิ้นนี้ ก็ไม่มีสิทธิ์แก้ไข
         messages.error(request, "คุณไม่มีสิทธิ์แก้ไขงานชิ้นนี้ เนื่องจากไม่ใช่ผู้สร้าง")
         return redirect('teacher:assignment_detail', pk=assignment.pk)
-    # --- จบส่วนที่แก้ไข ---
 
     if request.method == 'POST':
         form = AssignmentForm(request.POST, request.FILES, instance=assignment)

@@ -21,7 +21,7 @@ def login_view(request):
             if user.role.lower() == 'admin':
                 return redirect('admin_dashboard')
             elif user.role.lower() == 'student':
-                return redirect('student_dashboard')
+                return redirect('student:dashboard')
             else:
                 return redirect('teacher:dashboard')
 

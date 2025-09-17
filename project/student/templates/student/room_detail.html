@@ -4,59 +4,54 @@
 {% block title %}{{ room.name }} - {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container mt-4 mb-5">
 
-    <div class="p-5 mb-4 bg-light rounded-3 shadow-sm">
+    <div class="p-5 mb-4 rounded-3 shadow-sm" style="background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url({% if room.cover_image %}{{ room.cover_image.url }}{% else %}{% static 'img/default_cover.jpg' %}{% endif %}); background-size: cover; background-position: center; color: white;">
         <div class="container-fluid py-3">
             <h1 class="display-5 fw-bold">{{ room.name }}</h1>
-            <p class="text-muted">สอนโดย: {{ room.owner}}</p>
+            <p class="fs-5">สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</p>
         </div>
     </div>
 
-    <ul class="nav nav-tabs nav-fill mb-3" id="roomTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="stream-tab" data-bs-toggle="tab" data-bs-target="#stream-tab-pane" type="button" role="tab" aria-controls="stream-tab-pane" aria-selected="true">
-                <i class="fas fa-stream me-2"></i>กระดานสนทนา
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments-tab-pane" type="button" role="tab" aria-controls="assignments-tab-pane" aria-selected="false">
-                <i class="fas fa-tasks me-2"></i>งานของชั้นเรียน
-            </button>
-        </li>
+    <ul class="nav nav-tabs nav-fill mb-4" id="roomTab" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" id="stream-tab" data-bs-toggle="tab" data-bs-target="#stream-tab-pane" type="button"><i class="fas fa-stream me-2"></i>กระดานสนทนา</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments-tab-pane" type="button"><i class="fas fa-tasks me-2"></i>งานของชั้นเรียน</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="people-tab" data-bs-toggle="tab" data-bs-target="#people-tab-pane" type="button"><i class="fas fa-users me-2"></i>ผู้คน</button></li>
     </ul>
 
     <div class="tab-content" id="roomTabContent">
 
-        <div class="tab-pane fade show active" id="stream-tab-pane" role="tabpanel" aria-labelledby="stream-tab" tabindex="0">
-            <h3 class="mb-3">ประกาศล่าสุด</h3>
+        <div class="tab-pane fade show active" id="stream-tab-pane" role="tabpanel">
             {% for announcement in announcements %}
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex w-100 justify-content-between">
-                        <h5 class="card-title mb-1">ประกาศโดย {{ announcement.author.first_name }}</h5>
+                        <h5 class="card-title mb-1"><i class="fas fa-bullhorn text-primary me-2"></i> ประกาศโดย {{ announcement.author.get_full_name|default:announcement.author.email }}</h5>
                         <small class="text-muted">{{ announcement.created_at|date:"d M Y, H:i" }}</small>
                     </div>
                     <p class="card-text mt-2">{{ announcement.content|linebreaksbr }}</p>
+                    {% if announcement.files.all %}
+                        <hr><p class="mb-2"><strong>ไฟล์แนบ:</strong></p>
+                        <div class="list-group list-group-flush">
+                        {% for attachment in announcement.files.all %}
+                            <a href="{{ attachment.file.url }}" target="_blank" class="list-group-item list-group-item-action list-group-item-light py-2 px-3"><i class="fas fa-paperclip me-2"></i> {{ attachment }}</a>
+                        {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
             </div>
             {% empty %}
-            <div class="alert alert-info" role="alert">
-                ยังไม่มีประกาศในห้องเรียนนี้
-            </div>
+            <div class="alert alert-info text-center" role="alert">ยังไม่มีประกาศในห้องเรียนนี้</div>
             {% endfor %}
         </div>
 
-        <div class="tab-pane fade" id="assignments-tab-pane" role="tabpanel" aria-labelledby="assignments-tab" tabindex="0">
+        <div class="tab-pane fade" id="assignments-tab-pane" role="tabpanel">
             <h3 class="mb-3">รายการงานที่ได้รับมอบหมาย</h3>
             <div class="list-group">
                 {% for assignment in assignments %}
-                <a href="{% url 'student_assignment_detail' assignment.id %}" class="list-group-item list-group-item-action flex-column align-items-start mb-2 shadow-sm border-start-0 border-end-0 border-top-0 border-bottom-1">
+                <a href="#" class="list-group-item list-group-item-action mb-2 shadow-sm"> {# TODO: สร้าง URL 'student:assignment_detail' #}
                     <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1"><i class="fas fa-clipboard-list me-2"></i>{{ assignment.title }}</h5>
-                        
-                        {# --- ส่วนแสดงสถานะ (ตัวอย่าง) --- #}
-                        {# คุณอาจจะต้องเพิ่ม Logic ส่วนนี้ใน Model หรือ View #}
+                        <h5 class="mb-1"><i class="fas fa-clipboard-list text-info me-2"></i>{{ assignment.title }}</h5>
                         {% if assignment.submission_status == 'SUBMITTED' %}
                             <span class="badge bg-success">ส่งแล้ว</span>
                         {% elif assignment.submission_status == 'GRADED' %}
@@ -64,16 +59,25 @@
                         {% else %}
                             <span class="badge bg-warning text-dark">ยังไม่ได้ส่ง</span>
                         {% endif %}
-
                     </div>
-                    <p class="mb-1 text-muted">กำหนดส่ง: {{ assignment.due_date|date:"d F Y, H:i" }}</p>
+                    <p class="mb-1 text-muted">{% if assignment.due_date %}กำหนดส่ง: {{ assignment.due_date|date:"d F Y, H:i" }}{% else %}ไม่มีกำหนดส่ง{% endif %}</p>
                 </a>
                 {% empty %}
-                <div class="alert alert-info" role="alert">
-                    ยังไม่มีงานที่ได้รับมอบหมาย
-                </div>
+                <div class="alert alert-info text-center" role="alert">ยังไม่มีงานที่ได้รับมอบหมาย</div>
                 {% endfor %}
             </div>
+        </div>
+        
+        <div class="tab-pane fade" id="people-tab-pane" role="tabpanel">
+            <h3 class="text-primary border-bottom pb-2 mb-3">คณาจารย์</h3>
+            <ul class="list-group list-group-flush mb-4">
+                <li class="list-group-item d-flex align-items-center"><i class="fas fa-user-tie fa-lg text-muted me-3"></i><span>{{ room.owner.get_full_name|default:room.owner.email }} (เจ้าของห้อง)</span></li>
+                {% for teacher in room.teachers.all %}{% if teacher.user != room.owner %}<li class="list-group-item d-flex align-items-center"><i class="fas fa-user-circle fa-lg text-muted me-3"></i><span>{{ teacher.user.get_full_name|default:teacher.user.email }}</span></li>{% endif %}{% endfor %}
+            </ul>
+            <h3 class="text-primary border-bottom pb-2 mb-3 mt-5">เพื่อนร่วมชั้นเรียน</h3>
+            <ul class="list-group list-group-flush">
+                {% for student in room.students.all %}<li class="list-group-item d-flex align-items-center"><i class="fas fa-user-graduate text-muted me-3"></i><span>{{ student.user.get_full_name|default:student.user.email }}</span></li>{% empty %}<li class="list-group-item">ยังไม่มีนักเรียนในห้องนี้</li>{% endfor %}
+            </ul>
         </div>
     </div>
 </div>

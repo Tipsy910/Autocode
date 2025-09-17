@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-
+from django.urls import reverse
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -63,6 +63,16 @@ class User(AbstractUser):
         help_text="Specific permissions for this user.",
         related_name="users_user_permissions",
     )
+    
+    @property
+    def get_dashboard_url(self):
+        if self.role == self.Roles.TEACHER:
+            return reverse('teacher:dashboard')
+        elif self.role == self.Roles.STUDENT:
+            # สมมติว่า URL dashboard ของนักเรียนชื่อ 'student:dashboard'
+            return reverse('student:dashboard')
+        # ค่า Default สำหรับ Admin หรือ Role อื่นๆ
+        return '/'
 
     def __str__(self):
         return f"{self.email} ({self.get_role_display()})"
