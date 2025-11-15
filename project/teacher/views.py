@@ -235,9 +235,6 @@ def edit_announcement(request, pk):
 
 
 
-
-
-
 @login_required
 def create_assignment(request, room_id):
     room = get_object_or_404(Room, pk=room_id)
@@ -304,8 +301,8 @@ def teacher_assignment_detail(request, pk):
     student_submissions = []
     for student in students_in_room:
         student_submissions.append({
-            'student': student,
-            'submission': submission_map.get(student.id) # จะได้ Submission object หรือ None
+        'student': student,
+        'submission': submission_map.get(student.user.id) # <-- ✅ แก้ไขตรงนี้
         })
 
     context = {

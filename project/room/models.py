@@ -100,26 +100,43 @@ class Submission(models.Model):
         blank=True
     )
 
-    # 2. แก้ไข field เดิมให้สามารถเว้นว่างได้
-    submitted_file = models.FileField(
-        upload_to='submissions/files/',
-        blank=True, 
-        null=True
-    )
+    # 2. เพิ่ม field ใหม่สำหรับเก็บลิงก์
     
-    # 3. เพิ่ม field ใหม่สำหรับเก็บลิงก์
     submitted_link = models.URLField(
         max_length=500, # เผื่อสำหรับ URL ยาวๆ
         blank=True,
         null=True
     )
-
+    
     # ----------------------------------------
     
+    ai_score = models.IntegerField(
+        default=0, 
+        help_text="คะแนน (เต็ม 10) ที่ได้จาก AI"
+    )
+    ai_feedback = models.TextField(
+        blank=True, 
+        null=True, 
+        help_text="Feedback ที่ AI สร้างให้"
+    )
     quiz_generated = models.BooleanField(default=False)
 
     def __str__(self):
         return f'Submission by {self.student.username} for {self.assignment.title}'
+
+
+def submission_file_path(instance, filename):
+    # สร้าง Path: media/submission_files/room_1/assign_5/user_10/filename.pdf
+    return f"submission_files/room_{instance.submission.assignment.room.id}/assign_{instance.submission.assignment.id}/user_{instance.submission.student.id}/{filename}"
+
+class SubmissionFile(models.Model):
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField(upload_to=submission_file_path)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"File for submission {self.submission.id} ({self.file.name})"
+
 
 # --- โมเดลสำหรับควิซที่ AI สร้างขึ้นมาโดยเฉพาะ ---
 

@@ -1,0 +1,8 @@
+# Python cache (ไฟล์ที่ Python สร้างอัตโนมัติ)
+__pycache__/
+
+# Environment variables (ไม่สนไฟล์ .env ทั้งหมด)
+*.env
+env/
+# User uploaded files
+media/
