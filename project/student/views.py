@@ -16,27 +16,14 @@ import google.generativeai as genai
 import json
 from pydantic import BaseModel, Field
 from typing import List, Optional
+import mimetypes # 👈 (มาพร้อม Python)
+from google.api_core import retry # 👈 (อาจจะต้อง pip install google-api-core)
+from google.genai.types import Part,Blob   # 👈 สำหรับ Multimodal Input
+from .ai_schemas import AiMultiFeedback, AiQuiz, AiQuestion, AiChoice
+# -----------------------------------------------------------------
+#   1. Pydantic Model ใหม่ (สำหรับแยกไฟล์)
+# -----------------------------------------------------------------
 
-# ===================================================================
-# AI SETUP (วางไว้ด้านบนไฟล์ ต่อจาก Imports)
-# ===================================================================
-
-# --- 2. สร้าง Model Pydantic สำหรับ "Feedback" ---
-class AiFeedback(BaseModel):
-    score: int = Field(description="คะแนนที่ประเมินได้ (เต็ม 10)")
-    feedback: str = Field(description="ข้อความ Feedback โดยละเอียดสำหรับนักเรียน")
-
-# (หมายเหตุ: เราสร้าง Pydantic ของ Quiz ไว้เผื่อ แต่ยังไม่ใช้)
-class AiChoice(BaseModel):
-    choice_text: str = Field(description="ข้อความในตัวเลือก")
-    is_correct: bool = Field(description="ตัวเลือกนี้ถูกหรือผิด")
-
-class AiQuestion(BaseModel):
-    question_text: str = Field(description="ข้อความคำถาม")
-    choices: List[AiChoice] = Field(description="ลิสต์ของตัวเลือก 4 ข้อ")
-
-class AiQuiz(BaseModel):
-    questions: List[AiQuestion] = Field(description="ลิสต์ของคำถาม")
 
 load_dotenv()
 # --- 3. ตั้งค่า API KEY ---
@@ -53,41 +40,12 @@ except Exception as e:
     print(f"🚨 (CONFIG) ไม่สามารถโหลด Gemini Model: {e}")
     model = None # ตั้งค่าเป็น None ถ้าโหลดไม่สำเร็จ
 
-PROMPT_GRADING_INTELLIGENT = """
-คุณคือผู้ช่วยสอน (TA) ผู้เชี่ยวชาญด้านการเขียนโค้ด Python
-งานหลักของคุณคือการตรวจประเมิน "โค้ดของนักเรียน" ว่าทำงานได้ถูกต้องตรงตาม "คำอธิบายโจทย์" หรือไม่
-
-คุณจะได้รับข้อมูล 3 ส่วน:
-1. "คำอธิบายโจทย์" (นี่คือ Requirement หลักที่ใช้ตัดสิน)
-2. "โค้ดของนักเรียน"
-3. "Test Case" (นี่คือส่วนเสริม ถ้ามีก็ใช้ประกอบ ถ้าไม่มีก็ไม่เป็นไร)
-
-โปรดประเมินว่าโค้ดของนักเรียนแก้ปัญหานี้ได้ถูกต้องหรือไม่ ให้คะแนน (เต็ม 10)
-และให้ Feedback โดยละเอียด โดยเน้นที่การเปรียบเทียบกับ "คำอธิบายโจทย์" เป็นหลัก
-
---- 1. คำอธิบายโจทย์ (โจทย์หลัก) ---
-{problem_description}
---- END คำอธิบายโจทย์ ---
-
---- 2. โค้ดของนักเรียน ---
-{student_code}
---- END โค้ดของนักเรียน ---
-
---- 3. TEST CASE (ส่วนเสริม ถ้ามี) ---
-{test_case_data}
---- END TEST CASE ---
-
-กรุณาประเมินผลและตอบกลับตาม Schema ที่กำหนด
-"""
-
-
-def call_gemini_structured(prompt_text, pydantic_schema_class):
+def call_gemini_structured(prompt_parts_list, pydantic_schema_class):
     """
-    เรียก Gemini API ในโหมด Structured Output (บังคับตอบตาม Schema)
+    เรียก Gemini API (Multimodal) ในโหมด Structured Output
     """
-    print("\n--- ⏳ กำลังส่งคำสั่ง (Structured) ให้ Gemini ---")
+    print("\n--- ⏳ กำลังส่งคำสั่ง (Multimodal/Structured) ให้ Gemini ---")
     
-    # ตรวจสอบว่า Model พร้อมใช้งานหรือไม่
     if model is None:
         print("🚨 (CALL_GEMINI) Model ไม่ได้ถูกโหลด")
         return None
@@ -95,19 +53,25 @@ def call_gemini_structured(prompt_text, pydantic_schema_class):
     try:
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
-            response_schema=pydantic_schema_class # 👈 บังคับ Schema
+            response_schema=pydantic_schema_class
         )
         
+        # -----------------------------------------------------------------
+        #  ✅ นี่คือการแก้ไขที่สำคัญที่สุด ✅
+        #  เราเปลี่ยน 'prompt_text' (ที่ผิด) เป็น 'contents' (ที่ถูก)
+        # -----------------------------------------------------------------
         response = model.generate_content(
-            prompt_text,
-            generation_config=generation_config
+            contents=prompt_parts_list, # 👈 ⭐️ ใช้ 'contents' ⭐️
+            generation_config=generation_config,
+            request_options={'retry': retry.Retry(deadline=120)} # (เพิ่ม retry เข้ามาในนี้เลย)
         )
+        # -----------------------------------------------------------------
         
-        print("✅ Gemini ตอบกลับ (Structured) สำเร็จ")
+        print("✅ Gemini ตอบกลับ (Multimodal/Structured) สำเร็จ")
         return response.text
         
     except Exception as e:
-        print(f"🚨 เกิดข้อผิดพลาดในการเรียก Gemini (Structured): {e}")
+        print(f"🚨 เกิดข้อผิดพลาดในการเรียก Gemini (Multimodal/Structured): {e}")
         return None
 
 class student_dashboard(LoginRequiredMixin, View):
@@ -300,60 +264,148 @@ def student_assignment_detail_view(request, pk):
                 # -----------------------------------------------------------------
                 #  🤖 START: สั่ง AI ตรวจงานอัตโนมัติ (เฉพาะ Feedback)
                 # -----------------------------------------------------------------
-                print("--- 🤖 เริ่มการตรวจด้วย AI ---")
+                print("--- 🤖 เริ่มการตรวจด้วย AI (Multi-File) ---")
                 try:
-                    # --- 1. ดึงข้อมูลที่ "ต้องมี" ---
-                    student_file_obj = submission.files.first()
-                    problem_description = assignment.description
+                    # --- 1. ดึงข้อมูลโจทย์ (จาก 3 แหล่ง) ---
+                    problem_description = assignment.description    # (Text)
+                    problem_file_obj = assignment.problem_file      # (File โจทย์)
+                    test_case_file_obj = assignment.test_case_file  # (File เทสเคส)
                     
-                    if not api_key:
+                    if not api_key: 
                         raise Exception("ไม่พบ GOOGLE_API_KEY ในระบบ")
-                    if model is None:
-                         raise Exception("Gemini Model ไม่พร้อมใช้งาน")
-                    if not student_file_obj:
-                         raise Exception("ไม่พบไฟล์โค้ดที่นักเรียนส่ง")
-                    if not problem_description:
-                        raise Exception("อาจารย์ยังไม่ได้ใส่ 'คำอธิบายโจทย์' (Description)")
-
-                    # อ่านโค้ดนักเรียน
-                    student_code = student_file_obj.file.read().decode('utf-8')
-                    student_file_obj.file.seek(0)
+                    if model is None: 
+                        raise Exception("Gemini Model ไม่พร้อมใช้งาน")
                     
-                    # --- 2. ดึงข้อมูล "ส่วนเสริม" (Test Case) ---
-                    test_case_data = "ไม่มี Test Case ให้ (ให้ AI ประเมินจากโจทย์และโค้ดโดยตรง)"
-                    test_case_file_obj = assignment.test_case_file
+                    # --- 2. สร้าง "Prompt" แบบ List (Multimodal) ---
+                    prompt_parts = []
                     
-                    if test_case_file_obj:
-                        test_case_data = test_case_file_obj.file.read().decode('utf-8')
-                        test_case_file_obj.file.seek(0)
-                        print("--- ℹ️ พบ Test Case ส่วนเสริม ---")
-
-                    # --- 3. สร้าง Prompt ---
-                    final_prompt = PROMPT_GRADING_INTELLIGENT.format(
-                        problem_description=problem_description, # 👈 ป้อนโจทย์
-                        student_code=student_code,             # 👈 ป้อนโค้ด
-                        test_case_data=test_case_data          # 👈 ป้อน Test Case (ถ้ามี)
+                    # Part 1: คำสั่งหลัก (Text)
+                    prompt_parts.append(
+                        "คุณคือผู้ช่วยสอน (TA) ผู้เชี่ยวชาญ Python "
+                        "งานของคุณคือตรวจ 'โค้ดของนักเรียน' (ซึ่งอาจมีหลายไฟล์) เทียบกับ 'โจทย์' (ซึ่งอาจมีหลายข้อ) "
+                        "โจทย์อาจจะมาจาก 'คำอธิบาย (Text)', 'ไฟล์โจทย์ (PDF/Image)', หรือ 'ไฟล์ Test Case (เสริม)' "
+                        "กรุณาประเมินผล, ให้คะแนนย่อย_เต็ม 10_ (partial_score) สำหรับโค้ดแต่ละไฟล์, "
+                        "และให้คะแนนรวม_เต็ม 10_ (total_score) สำหรับงานทั้งหมด"
                     )
                     
-                    # --- 4. เรียก AI (แบบ Structured) ---
-                    ai_response_grading = call_gemini_structured(
-                        final_prompt, 
-                        AiFeedback  # (ยังใช้ Schema Feedback เหมือนเดิม)
-                    )
+                    # Part 2: โจทย์ (Text Description)
+                    if problem_description:
+                        prompt_parts.append(f"\n--- 1. คำอธิบายโจทย์ (Text) ---\n{problem_description}")
                     
-                    if ai_response_grading:
-                        data = json.loads(ai_response_grading)
-                        submission.ai_feedback = data.get('feedback', 'AI processing error.')
-                        submission.ai_score = data.get('score', 0)
-                        submission.quiz_generated = False # ยังไม่สร้างควิซ
-                        submission.save()
-                        print("✅ บันทึก Feedback (Intelligent) จาก AI สำเร็จ")
-                        messages.success(request, f'ส่งงานเรียบร้อยแล้ว ระบบตรวจ AI สำเร็จ')
-                    else:
-                        raise Exception("AI ไม่สามารถประมวลผลคำขอได้ (ได้ค่า None)")
+                    # Part 3: ไฟล์โจทย์ (PDF/Image) - (ถ้ามี)
+                    if problem_file_obj:
+                        print(f"--- ℹ️ กำลังอ่านไฟล์โจทย์ (บังคับโหมด PDF): {problem_file_obj.name} ---")
                         
+                        # 1. อ่าน Bytes (เหมือนเดิม)
+                        file_bytes = problem_file_obj.file.read()
+                        problem_file_obj.file.seek(0)
+                        
+                        mime_type = mimetypes.guess_type(problem_file_obj.name)[0]
+                        # (เอาระบบ Check กลับมา)
+                        if mime_type in ["application/pdf", "image/png", "image/jpeg"]:
+                            print(f"--- ℹ️ ตรวจพบ MimeType: {mime_type} ---")
+                            prompt_parts.append(f"\n--- 2. ไฟล์โจทย์หลัก ({mime_type}) ---")
+                            
+                            # (ใช้วิธีส่ง Dict ที่ถูกต้อง ที่คุณค้นพบ)
+                            prompt_parts.append(
+                                {
+                                    "mime_type": mime_type,
+                                    "data": file_bytes 
+                                }
+                            )
+                        else:
+                            # (เอาระบบดักจับ Error กลับมา)
+                            prompt_parts.append(f"\n--- 2. ไฟล์โจทย์หลัก (ไม่รองรับ MimeType: {mime_type}) ---")
+
+                    # Part 4: ไฟล์เทสเคส (Text) - (ถ้ามี)
+                    if test_case_file_obj:
+                        print(f"--- ℹ️ กำลังอ่านไฟล์เทสเคส (Text): {test_case_file_obj.name} ---")
+                        try:
+                            test_case_data = test_case_file_obj.file.read().decode('utf-8')
+                        except UnicodeDecodeError:
+                            test_case_data = "[ไม่สามารถอ่านไฟล์ Test Case นี้ได้]"
+                        test_case_file_obj.file.seek(0)
+                        prompt_parts.append(f"\n--- 3. ไฟล์ Test Case (เสริม) ---\n{test_case_data}")
+
+                    # -----------------------------------------------------------------
+                    #  ✅ 3. อ่านโค้ดนักเรียน "ทุกไฟล์"
+                    # -----------------------------------------------------------------
+                    student_files = submission.files.all()
+                    if not student_files:
+                        raise Exception("ไม่พบไฟล์โค้ดที่นักเรียนส่ง (Submission.files ว่างเปล่า)")
+
+                    student_code_blob_parts = ["\n--- 4. โค้ดของนักเรียน (ทั้งหมดที่จะตรวจ) ---"]
+                    for student_file_obj in student_files:
+                        try:
+                            # อ่านไฟล์
+                            student_code = student_file_obj.file.read().decode('utf-8')
+                            student_file_obj.file.seek(0)
+                        except UnicodeDecodeError:
+                            student_code = "[ไม่สามารถอ่านไฟล์นี้ได้ อาจไม่ใช่ Text File]"
+                            student_file_obj.file.seek(0)
+                        
+                        # สร้างตัวคั่นที่ชัดเจนให้ AI
+                        # (ใช้ os.path.basename เพื่อเอาเฉพาะชื่อไฟล์)
+                        file_name = os.path.basename(student_file_obj.file.name)
+                        student_code_blob_parts.append(f"\n[START FILE: {file_name}]")
+                        student_code_blob_parts.append(student_code)
+                        student_code_blob_parts.append(f"[END FILE: {file_name}]")
+                    
+                    # รวมทุกไฟล์โค้ดเป็น String ก้อนเดียว
+                    prompt_parts.append("\n".join(student_code_blob_parts))
+                    
+                    # -----------------------------------------------------------------
+                    #  ✅ 4. เรียก AI ด้วย Schema ใหม่
+                    # -----------------------------------------------------------------
+                    print("--- ⏳ กำลังส่งคำสั่ง (Multi-File) ให้ Gemini ---")
+                    generation_config = genai.GenerationConfig(
+                        response_mime_type="application/json",
+                        response_schema=AiMultiFeedback # 👈 ⭐️ ใช้ Schema ใหม่ (Multi)
+                    )
+                    
+                    response = model.generate_content(
+                        contents=prompt_parts, 
+                        generation_config=generation_config,
+                        request_options={'retry': retry.Retry(deadline=120)} # เผื่อเวลาอ่านไฟล์
+                    )
+                    
+                    print("✅ Gemini ตอบกลับ (Multi-File) สำเร็จ")
+
+                    # -----------------------------------------------------------------
+                    #  ✅ 5. ประมวลผล JSON และ "ต่อ" Feedback
+                    # -----------------------------------------------------------------
+                    data = json.loads(response.text)
+                    
+                    # 1. ดึงคะแนนรวม (จาก AI)
+                    total_score = data.get('total_score', 0)
+                    
+                    # 2. สร้าง Feedback รวม (จากที่คุณต้องการ)
+                    combined_feedback_list = []
+                    feedbacks_from_ai = data.get('feedbacks', [])
+                    
+                    if not feedbacks_from_ai:
+                        # กรณี AI ตอบกลับมา แต่ไม่มี List Feedback
+                        combined_feedback_list.append("AI ไม่ได้ให้ Feedback แยกส่วน")
+                    
+                    for fb in feedbacks_from_ai:
+                        combined_feedback_list.append(
+                            f"--- Feedback สำหรับ: {fb.get('file_name')} (คะแนนย่อย: {fb.get('partial_score')}/10) ---\n"
+                            f"{fb.get('feedback_text', 'N/A')}\n"
+                        )
+                    
+                    final_feedback_string = "\n".join(combined_feedback_list)
+                    
+                    # 3. บันทึกลง DB
+                    submission.ai_score = total_score
+                    submission.ai_feedback = final_feedback_string # 👈 บันทึกเป็น Text ยาวๆ
+                    submission.quiz_generated = False # ยังไม่สร้างควิซ
+                    submission.save()
+                    
+                    print("✅ บันทึก Feedback (Multi-File) จาก AI สำเร็จ")
+                    messages.success(request, f'ส่งงานเรียบร้อยแล้ว ระบบตรวจ AI สำเร็จ')
+
                 except Exception as e:
-                    print(f"--- 🚨 เกิดข้อผิดพลาดระหว่างการตรวจ AI: {e} ---")
+                    print(f"--- 🚨 เกิดข้อผิดพลาดร้ายแรงระหว่างการตรวจ AI: {e} ---")
                     submission.ai_feedback = f"เกิดข้อผิดพลาดในการประมวลผล AI: {e}"
                     submission.ai_score = 0
                     submission.quiz_generated = False

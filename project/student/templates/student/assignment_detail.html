@@ -20,6 +20,15 @@
                 <p class="lead">{{ assignment.description|linebreaksbr }}</p>
             {% endif %}
 
+            {% if assignment.problem_file %}
+                <a href="{{ assignment.problem_file.url }}" class="list-group-item list-group-item-action" target="_blank">
+                    <i class="fas fa-file-pdf text-danger me-2"></i> 
+                    <strong>ไฟล์โจทย์หลัก</strong> (PDF/Image)
+                    <small class="ms-2 text-muted">(คลิกเพื่อเปิดในแท็บใหม่)</small>
+                </a>
+            {% endif %}
+
+
             {% if assignment.test_case_file %}
             <div class="mt-4">
                 <h5>ไฟล์ประกอบ:</h5>

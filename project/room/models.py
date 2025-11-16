@@ -4,6 +4,7 @@ import string
 import random
 from users.models import Students, Teachers
 from django.contrib.auth.models import User
+
 # ฟังก์ชันที่สร้างรหัสเชิญที่ไม่ซ้ำกัน
 def generate_invite_code():
     length = 6
@@ -11,6 +12,20 @@ def generate_invite_code():
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
         if not Room.objects.filter(invite_code=code).exists():
             return code
+
+def assignment_problem_file_path(instance, filename):
+    # Path: media/problem_files/room_1/assign_5/problem.pdf
+    return f"problem_files/room_{instance.room.id}/assign_{instance.id}/{filename}"
+
+def assignment_test_case_file_path(instance, filename):
+    """
+    สร้าง Path: media/test_case_files/room_<id>/assign_<id>/filename
+    """
+    return f"test_case_files/room_{instance.room.id}/assign_{instance.id}/{filename}"
+
+def submission_file_path(instance, filename):
+    # สร้าง Path: media/submission_files/room_1/assign_5/user_10/filename.pdf
+    return f"submission_files/room_{instance.submission.assignment.room.id}/assign_{instance.submission.assignment.id}/user_{instance.submission.student.id}/{filename}"
 
 class Room(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='owned_rooms')
@@ -27,8 +42,6 @@ class Room(models.Model):
 
     def __str__(self):
         return self.name
-
-
 
 class SubmissionType(models.Model):
     name = models.CharField(max_length=100, help_text="ชื่อที่แสดงผล เช่น 'ไฟล์ Python', 'Google Colab Link'")
@@ -50,9 +63,17 @@ class Assignment(models.Model):
 
     # --- ส่วนตั้งค่าสำหรับ AI Quiz Generation ---
     test_case_file = models.FileField(
-        upload_to='assignments/test_cases/', blank=True, null=True,
+        upload_to= assignment_test_case_file_path, blank=True, null=True,
         help_text="ไฟล์ Test Case (.json, .txt, .zip) เพื่อให้ AI ใช้อ้างอิงสร้างควิซ"
     )
+    
+    problem_file = models.FileField(
+        upload_to=assignment_problem_file_path,
+        blank=True, 
+        null=True,
+        help_text="อัปโหลดไฟล์โจทย์ (PDF, PNG, JPG)"
+    )
+    
     quiz_question_count = models.PositiveIntegerField(
         default=5, help_text="จำนวนคำถามในควิซที่ต้องการให้ AI สร้าง"
     )
@@ -79,7 +100,6 @@ class Assignment(models.Model):
     def __str__(self):
         return self.title
 
-
 class Submission(models.Model):
     assignment = models.ForeignKey('room.Assignment', on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey(
@@ -88,9 +108,6 @@ class Submission(models.Model):
         related_name='submissions'
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
-    
-    # --- ส่วนที่เปลี่ยนแปลงและเพิ่มเข้ามา ---
-    
     # 1. ระบุประเภทของการส่งงานครั้งนี้
     submission_type = models.ForeignKey(
         SubmissionType, 
@@ -124,11 +141,6 @@ class Submission(models.Model):
     def __str__(self):
         return f'Submission by {self.student.username} for {self.assignment.title}'
 
-
-def submission_file_path(instance, filename):
-    # สร้าง Path: media/submission_files/room_1/assign_5/user_10/filename.pdf
-    return f"submission_files/room_{instance.submission.assignment.room.id}/assign_{instance.submission.assignment.id}/user_{instance.submission.student.id}/{filename}"
-
 class SubmissionFile(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='files')
     file = models.FileField(upload_to=submission_file_path)
@@ -136,7 +148,6 @@ class SubmissionFile(models.Model):
 
     def __str__(self):
         return f"File for submission {self.submission.id} ({self.file.name})"
-
 
 # --- โมเดลสำหรับควิซที่ AI สร้างขึ้นมาโดยเฉพาะ ---
 
@@ -169,7 +180,6 @@ class GeneratedChoice(models.Model):
     question = models.ForeignKey(GeneratedQuestion, on_delete=models.CASCADE, related_name='choices')
     choice_text = models.TextField()
     
-
 class Announcement(models.Model):
     """
     โมเดลสำหรับเก็บประกาศ 1 ชิ้น
