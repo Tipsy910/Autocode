@@ -150,36 +150,6 @@ class SubmissionFile(models.Model):
         return f"File for submission {self.submission.id} ({self.file.name})"
 
 # --- โมเดลสำหรับควิซที่ AI สร้างขึ้นมาโดยเฉพาะ ---
-
-class GeneratedQuiz(models.Model):
-    """
-    โมเดลสำหรับเก็บ "ชุดควิซ" ที่ AI สร้างขึ้นสำหรับ Submission ชิ้นเดียว
-    (One-to-One Relationship กับ Submission)
-    """
-    submission = models.OneToOneField(Submission, on_delete=models.CASCADE, related_name='generated_quiz')
-    created_at = models.DateTimeField(auto_now_add=True)
-    # ข้อมูลการทำควิซของนักเรียน
-    score = models.FloatField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return f"Quiz for Submission ID: {self.submission.id}"
-
-class GeneratedQuestion(models.Model):
-    """
-    เก็บคำถาม 1 ข้อ ที่ AI สร้างขึ้น
-    """
-    quiz = models.ForeignKey(GeneratedQuiz, on_delete=models.CASCADE, related_name='questions')
-    question_text = models.TextField()
-    correct_answer_text = models.TextField(help_text="เก็บ text ของคำตอบที่ถูกต้องที่ AI บอกมา") # เพื่อใช้เปรียบเทียบ
-
-class GeneratedChoice(models.Model):
-    """
-    เก็บตัวเลือก 1 ตัว ที่ AI สร้างขึ้น
-    """
-    question = models.ForeignKey(GeneratedQuestion, on_delete=models.CASCADE, related_name='choices')
-    choice_text = models.TextField()
-    
 class Announcement(models.Model):
     """
     โมเดลสำหรับเก็บประกาศ 1 ชิ้น
@@ -214,3 +184,29 @@ class AnnouncementFile(models.Model):
     def __str__(self):
         # ดึงชื่อไฟล์จาก path
         return self.file.name.split('/')[-1]
+    
+class GeneratedQuestion(models.Model):
+    # 👇 ผูกกับ "การส่งงาน" (Submission) ไม่ใช่ "ตัวงาน" (Assignment)
+    # แปลว่า นักเรียน 10 คนส่งงาน ก็จะมีชุดคำถาม 10 ชุดแยกกัน
+    submission = models.ForeignKey(
+        Submission, 
+        on_delete=models.CASCADE, 
+        related_name='generated_questions'
+    )
+    text = models.TextField(help_text="โจทย์ที่ AI สร้าง")
+    order = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"AI Q: {self.text[:30]}"
+
+class GeneratedChoice(models.Model):
+    question = models.ForeignKey(
+        GeneratedQuestion, 
+        on_delete=models.CASCADE, 
+        related_name='choices'
+    )
+    text = models.CharField(max_length=255)
+    is_correct = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.text

@@ -11,7 +11,8 @@ class AiFileFeedback(BaseModel):
     feedback_text: str = Field(description="ข้อความ Feedback เฉพาะสำหรับ 'ไฟล์นี้ไฟล์เดียว'")
 
 class AiMultiFeedback(BaseModel):
-    total_score: int = Field(description="คะแนน 'รวม' (เต็ม 10) สำหรับงานทั้งหมดทุกไฟล์")
+    total_score: int = Field(description="คะแนน 'รวม' ที่ประเมินได้ (Based on assignment max score)")
+    overall_summary: str = Field(description="สรุปภาพรวมสั้นๆ ของงานทั้งหมด (Short Overall Feedback)")
     feedbacks: List[AiFileFeedback] = Field(
         description="ลิสต์ของ Feedback โดยประเมินแยกตามแต่ละไฟล์ที่นักเรียนส่งมา"
     )
