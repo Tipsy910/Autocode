@@ -635,3 +635,56 @@ def student_assignment_detail_view(request, pk):
         'allow_file_submission': allow_file_submission,
     }
     return render(request, 'student/assignment_detail.html', context)
+
+@login_required
+def take_quiz(request, pk):
+    # 1. ดึงข้อมูล Submission และคำถามที่เกี่ยวข้อง
+    submission = get_object_or_404(Submission, pk=pk, user=request.user)
+    questions = submission.generated_questions.all().order_by('order')
+    
+    if not questions:
+        # ถ้าไม่มีควิซ ให้เด้งกลับไปหน้างาน
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    # --- กรณีส่งคำตอบ (POST) ---
+    if request.method == 'POST':
+        score = 0
+        total_questions = questions.count()
+        results = [] # เก็บผลลัพธ์ไว้โชว์ว่าข้อไหนถูก/ผิด
+
+        for question in questions:
+            # ชื่อ field ใน html คือ "question_ID"
+            selected_choice_id = request.POST.get(f'question_{question.id}')
+            
+            is_correct = False
+            correct_choice = question.choices.filter(is_correct=True).first()
+            
+            if selected_choice_id:
+                selected_choice = GeneratedChoice.objects.filter(id=selected_choice_id).first()
+                if selected_choice and selected_choice.is_correct:
+                    score += 1
+                    is_correct = True
+            
+            results.append({
+                'question': question,
+                'is_correct': is_correct,
+                'correct_choice': correct_choice
+            })
+
+        # (Optional) คุณอาจจะอยากบันทึกคะแนน Quiz ลง Database ตรงนี้
+        # submission.quiz_score = score 
+        # submission.save()
+
+        # ส่งผลลัพธ์ไปหน้า Result
+        return render(request, 'student/quiz_result.html', {
+            'submission': submission,
+            'score': score,
+            'total': total_questions,
+            'results': results
+        })
+
+    # --- กรณีเปิดหน้าเว็บ (GET) ---
+    return render(request, 'student/take_quiz.html', {
+        'submission': submission,
+        'questions': questions
+    })

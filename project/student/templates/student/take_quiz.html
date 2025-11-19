@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fas fa-puzzle-piece"></i> AI Quiz: {{ submission.assignment.title }}</h4>
+        </div>
+        <div class="card-body">
+            <p class="alert alert-info">
+                แบบทดสอบนี้ถูกสร้างขึ้นโดย AI จากโค้ดที่คุณส่ง
+            </p>
+
+            <form method="POST">
+                {% csrf_token %}
+                
+                {% for q in questions %}
+                <div class="mb-4 p-3 border rounded">
+                    <h5 class="mb-3">{{ forloop.counter }}. {{ q.text }}</h5>
+                    
+                    <div class="list-group">
+                        {% for choice in q.choices.all %}
+                        <label class="list-group-item list-group-item-action">
+                            <input class="form-check-input me-2" type="radio" 
+                                   name="question_{{ q.id }}" 
+                                   value="{{ choice.id }}" required>
+                            {{ choice.text }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-check-circle"></i> ส่งคำตอบ
+                    </button>
+                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-secondary">
+                        ยกเลิก
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

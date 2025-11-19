@@ -137,6 +137,7 @@ class Submission(models.Model):
         help_text="Feedback ที่ AI สร้างให้"
     )
     quiz_generated = models.BooleanField(default=False)
+    quiz_score = models.IntegerField(default=0, help_text="คะแนนที่นักเรียนทำได้จาก Quiz")
 
     def __str__(self):
         return f'Submission by {self.student.username} for {self.assignment.title}'

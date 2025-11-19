@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <div class="card shadow p-4">
+        <h2 class="text-primary mb-3">ผลการทดสอบ</h2>
+        
+        <div class="display-1 mb-3 font-weight-bold 
+            {% if score == total %}text-success{% else %}text-warning{% endif %}">
+            {{ score }} / {{ total }}
+        </div>
+
+        <h5 class="mb-4">คะแนนของคุณ</h5>
+
+        <div class="text-start">
+            <h5>เฉลยละเอียด:</h5>
+            <ul class="list-group mb-4">
+                {% for item in results %}
+                <li class="list-group-item {% if item.is_correct %}list-group-item-success{% else %}list-group-item-danger{% endif %}">
+                    <strong>ข้อที่ {{ forloop.counter }}:</strong> {{ item.question.text }}<br>
+                    {% if item.is_correct %}
+                        <span class="badge bg-success">ถูกต้อง ✅</span>
+                    {% else %}
+                        <span class="badge bg-danger">ผิด ❌</span> 
+                        <small class="text-muted">คำตอบที่ถูกคือ: {{ item.correct_choice.text }}</small>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-primary btn-lg">
+            กลับหน้ารายละเอียดงาน
+        </a>
+    </div>
+</div>
+{% endblock %}
