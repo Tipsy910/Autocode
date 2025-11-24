@@ -1,8 +1,8 @@
 # --- student/ai_schemas.py ---
 # (ไฟล์ใหม่สำหรับเก็บ Pydantic Models ทั้งหมด)
-
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from typing_extensions import TypedDict
 
 # --- Model สำหรับ Feedback (แบบแยกไฟล์) ---
 class AiFileFeedback(BaseModel):
@@ -17,14 +17,13 @@ class AiMultiFeedback(BaseModel):
         description="ลิสต์ของ Feedback โดยประเมินแยกตามแต่ละไฟล์ที่นักเรียนส่งมา"
     )
 
-# --- Model สำหรับ Quiz (เผื่อไว้) ---
-class AiChoice(BaseModel):
-    choice_text: str = Field(description="ข้อความในตัวเลือก")
-    is_correct: bool = Field(description="ตัวเลือกนี้ถูกหรือผิด")
+class QuizChoiceSchema(TypedDict):
+    text: str
+    is_correct: bool
 
-class AiQuestion(BaseModel):
-    question_text: str = Field(description="ข้อความคำถาม")
-    choices: List[AiChoice] = Field(description="ลิสต์ของตัวเลือก 4 ข้อ")
+class QuizQuestionSchema(TypedDict):
+    question_text: str
+    choices: List[QuizChoiceSchema]
 
-class AiQuiz(BaseModel):
-    questions: List[AiQuestion] = Field(description="ลิสต์ของคำถาม")
+class QuizSchema(TypedDict):
+    questions: List[QuizQuestionSchema]

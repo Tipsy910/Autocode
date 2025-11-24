@@ -3,7 +3,7 @@
 {% load room_tags %} {% block title %}{{ assignment.title }} - {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4 mb-5">
+    <div class="container mt-4 mb-5">
     
     <div class="row g-5">
         <div class="col-md-8">
@@ -41,7 +41,7 @@
             <hr class="my-4"> <div class="ai-feedback-section mt-3">
             <h3 class="text-info"><i class="fas fa-robot me-2"></i> ผลการตรวจจาก AI</h3>
             <p class="mb-1 lead">
-                <strong>คะแนน (เบื้องต้น):</strong> {{ submission.ai_score|floatformat:0 }} / 10
+                <strong>คะแนน AI::</strong>  {{ submission.ai_score }} / {{ assignment.score }}
             </p>
             <p class="mb-1 lead"><strong>Feedback:</strong></p>
             <div class="card bg-light p-3 lead"> 
@@ -49,10 +49,54 @@
             </div>
         </div>
     {% endif %}
-            
-            
+        <div class="mt-4">
+    <h4 class="mb-3"><i class="fas fa-tasks"></i> แบบทดสอบ (AI Generated Quiz)</h4>
+
+    {% if submission.quiz_generated %}
+        <div class="card border-success">
+            <div class="card-body text-center p-4">
+                {% if submission.quiz_score > 0 %}
+                    <h3 class="text-success">คุณทำแบบทดสอบแล้ว</h3>
+                    <p class="display-6">{{ submission.quiz_score }} คะแนน</p>
+                    <a href="{% url 'student:take_quiz' submission.pk %}" class="btn btn-outline-success">ดูผลสอบ</a>
+                {% else %}
+                    <h5 class="text-success mb-3">แบบทดสอบพร้อมแล้ว!</h5>
+                    <a href="{% url 'student:take_quiz' submission.pk %}" class="btn btn-success btn-lg pulse-button">
+                        <i class="fas fa-play me-2"></i> เริ่มทำแบบทดสอบ
+                    </a>
+                {% endif %}
+            </div>
         </div>
 
+    {% else %}
+        {% if assignment.quiz_questions_count > 0 %}
+            {% if submission.ai_feedback %}
+                <div class="card border-primary bg-light">
+                    <div class="card-body text-center p-5">
+                        <i class="fas fa-robot fa-3x text-primary mb-3"></i>
+                        <h5>สร้างแบบทดสอบเฉพาะบุคคล</h5>
+                        <p class="text-muted">ให้ AI วิเคราะห์โค้ดของคุณและสร้างโจทย์เพื่อทดสอบความเข้าใจ</p>
+                        
+                        <form action="{% url 'student:generate_quiz' submission.pk %}" method="POST">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-lg shadow">
+                                <i class="fas fa-magic me-2"></i> สร้างแบบทดสอบด้วย AI
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-secondary">
+                    <i class="fas fa-lock me-2"></i> ต้องรอให้ AI ตรวจงานเสร็จก่อน จึงจะสร้างแบบทดสอบได้
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-info">งานนี้ไม่มีแบบทดสอบ</div>
+        {% endif %}
+    {% endif %}
+    </div>
+            
+        </div>
         <div class="col-md-4">
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -161,6 +205,10 @@
                  <div class="card-footer text-muted small">
                     กำหนดส่ง: {% if assignment.due_date %}{{ assignment.due_date|date:"d F Y, H:i" }}{% else %}ไม่มีกำหนดส่ง{% endif %}
                 </div>
+                
+
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -205,3 +253,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

@@ -340,8 +340,32 @@ def edit_assignment(request, pk):
         return redirect('teacher:assignment_detail', pk=assignment.pk)
 
     if request.method == 'POST':
+        # ✅ ถูกต้อง: มี request.FILES
         form = AssignmentForm(request.POST, request.FILES, instance=assignment)
+        
         if form.is_valid():
+            # ============================================================
+            # 🧹 ADD: เช็คว่ามีการอัปโหลดไฟล์ใหม่มาไหม? ถ้ามี ให้ลบอันเก่าทิ้ง
+            # ============================================================
+            
+            # 1. เช็คไฟล์โจทย์ (problem_file)
+            if 'problem_file' in request.FILES:
+                # ถ้ามีไฟล์เก่าอยู่ ให้ลบทิ้งก่อน
+                if assignment.problem_file:
+                    try:
+                        assignment.problem_file.delete(save=False)
+                    except:
+                        pass # ถ้าลบไม่ได้ (เช่นไฟล์หายไปแล้ว) ก็ปล่อยผ่าน
+
+            # 2. เช็คไฟล์เทสเคส (test_case_file)
+            if 'test_case_file' in request.FILES:
+                if assignment.test_case_file:
+                    try:
+                        assignment.test_case_file.delete(save=False)
+                    except:
+                        pass
+            # ============================================================
+
             form.save()
             messages.success(request, f"แก้ไขงาน '{assignment.title}' เรียบร้อยแล้ว")
             return redirect('teacher:assignment_detail', pk=assignment.pk)

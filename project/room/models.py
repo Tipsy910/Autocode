@@ -116,17 +116,13 @@ class Submission(models.Model):
         null=True, # ตั้งเป็น null=True เพื่อให้ migration ผ่านได้ง่ายสำหรับข้อมูลเก่า
         blank=True
     )
-
     # 2. เพิ่ม field ใหม่สำหรับเก็บลิงก์
-    
     submitted_link = models.URLField(
         max_length=500, # เผื่อสำหรับ URL ยาวๆ
         blank=True,
         null=True
     )
-    
     # ----------------------------------------
-    
     ai_score = models.IntegerField(
         default=0, 
         help_text="คะแนน (เต็ม 10) ที่ได้จาก AI"
@@ -186,28 +182,64 @@ class AnnouncementFile(models.Model):
         # ดึงชื่อไฟล์จาก path
         return self.file.name.split('/')[-1]
     
-class GeneratedQuestion(models.Model):
-    # 👇 ผูกกับ "การส่งงาน" (Submission) ไม่ใช่ "ตัวงาน" (Assignment)
-    # แปลว่า นักเรียน 10 คนส่งงาน ก็จะมีชุดคำถาม 10 ชุดแยกกัน
-    submission = models.ForeignKey(
-        Submission, 
+class Quiz(models.Model):
+    # ผูกกับ Submission (1 การส่งงาน มี 1 ควิซ)
+    submission = models.OneToOneField(
+        'Submission', 
         on_delete=models.CASCADE, 
-        related_name='generated_questions'
+        related_name='quiz' 
     )
-    text = models.TextField(help_text="โจทย์ที่ AI สร้าง")
-    order = models.IntegerField(default=0)
+    
+    # วันที่สร้างควิซ
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # คะแนนที่ทำได้จริง (เช่น สอบได้ 4)
+    score = models.IntegerField(default=0, help_text="คะแนนที่นักเรียนทำได้")
+    
+    # คะแนนเต็ม/จำนวนข้อทั้งหมด (เช่น เต็ม 5) -> สำคัญมาก เอาไว้คำนวณเกรด
+    total_questions = models.IntegerField(default=0, help_text="จำนวนข้อสอบทั้งหมดในชุดนี้")
+    
+    # สถานะว่าทำเสร็จหรือยัง (True = ส่งกระดาษคำตอบแล้ว)
+    is_completed = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"AI Q: {self.text[:30]}"
+        status = "Completed" if self.is_completed else "Pending"
+        return f"Quiz for {self.submission.student.user.email} - {status} ({self.score}/{self.total_questions})"
 
-class GeneratedChoice(models.Model):
+# ==========================================
+# 2. ตารางเก็บคำถาม (Question)
+# ==========================================
+class QuizQuestion(models.Model):
+    # ผูกกับ Quiz ถ้าลบ Quiz คำถามจะหายไปด้วย
+    quiz = models.ForeignKey(
+        Quiz, 
+        on_delete=models.CASCADE, 
+        related_name='questions'
+    )
+    
+    text = models.TextField(help_text="โจทย์คำถาม")
+    order = models.PositiveIntegerField(default=0, help_text="ลำดับข้อ (1, 2, 3...)")
+
+    class Meta:
+        ordering = ['order'] # สั่งให้เรียงตามลำดับเสมอเวลาดึงข้อมูล
+
+    def __str__(self):
+        return f"ข้อที่ {self.order}: {self.text[:50]}..."
+
+# ==========================================
+# 3. ตารางเก็บตัวเลือก (Choices)
+# ==========================================
+class QuizChoice(models.Model):
+    # ผูกกับ Question ถ้าลบคำถาม ตัวเลือกจะหายไปด้วย
     question = models.ForeignKey(
-        GeneratedQuestion, 
+        QuizQuestion, 
         on_delete=models.CASCADE, 
         related_name='choices'
     )
-    text = models.CharField(max_length=255)
-    is_correct = models.BooleanField(default=False)
+    
+    text = models.CharField(max_length=255, help_text="ข้อความตัวเลือก")
+    is_correct = models.BooleanField(default=False, help_text="ทำเครื่องหมายถ้าเป็นข้อที่ถูก")
 
     def __str__(self):
-        return self.text
+        mark = "✅" if self.is_correct else ""
+        return f"{mark} {self.text}"
