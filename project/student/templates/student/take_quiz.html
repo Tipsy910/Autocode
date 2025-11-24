@@ -1,46 +1,67 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+
+{% block title %}ทำแบบทดสอบ - {{ submission.assignment.title }}{% endblock %}
 
 {% block content %}
 <div class="container mt-5 mb-5">
-    <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h4 class="mb-0"><i class="fas fa-puzzle-piece"></i> AI Quiz: {{ submission.assignment.title }}</h4>
-        </div>
-        <div class="card-body">
-            <p class="alert alert-info">
-                แบบทดสอบนี้ถูกสร้างขึ้นโดย AI จากโค้ดที่คุณส่ง
-            </p>
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            
+            <div class="card border-primary shadow-sm mb-4">
+                <div class="card-body text-center p-4">
+                    <h2 class="card-title text-primary"><i class="fas fa-edit me-2"></i>แบบทดสอบความเข้าใจ</h2>
+                    <p class="lead text-muted">{{ submission.assignment.title }}</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <span class="badge bg-secondary p-2">จำนวน {{ quiz.total_questions }} ข้อ</span>
+                        <span class="badge bg-info text-dark p-2">AI Generated</span>
+                    </div>
+                </div>
+            </div>
 
-            <form method="POST">
+            <form method="POST" action="">
                 {% csrf_token %}
                 
-                {% for q in questions %}
-                <div class="mb-4 p-3 border rounded">
-                    <h5 class="mb-3">{{ forloop.counter }}. {{ q.text }}</h5>
-                    
-                    <div class="list-group">
-                        {% for choice in q.choices.all %}
-                        <label class="list-group-item list-group-item-action">
-                            <input class="form-check-input me-2" type="radio" 
-                                   name="question_{{ q.id }}" 
-                                   value="{{ choice.id }}" required>
-                            {{ choice.text }}
-                        </label>
-                        {% endfor %}
+                {% for question in quiz.questions.all %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0">
+                            <span class="badge bg-primary me-2">ข้อที่ {{ forloop.counter }}</span> 
+                            {{ question.text }}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            {% for choice in question.choices.all %}
+                            <label class="list-group-item list-group-item-action d-flex align-items-center cursor-pointer">
+                                <input class="form-check-input me-3" type="radio" 
+                                       name="question_{{ question.id }}" 
+                                       value="{{ choice.id }}" required>
+                                {{ choice.text }}
+                            </label>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
 
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-success btn-lg">
-                        <i class="fas fa-check-circle"></i> ส่งคำตอบ
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-success btn-lg py-3" onclick="return confirm('ยืนยันการส่งคำตอบ?');">
+                        <i class="fas fa-paper-plane me-2"></i> ส่งกระดาษคำตอบ
                     </button>
-                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-secondary">
-                        ยกเลิก
+                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-outline-secondary">
+                        ยกเลิก / กลับไปหน้างาน
                     </a>
                 </div>
             </form>
+
         </div>
     </div>
 </div>
+
+<style>
+    /* CSS เสริมให้คลิกง่ายขึ้น */
+    .cursor-pointer { cursor: pointer; }
+    .list-group-item:hover { background-color: #f8f9fa; }
+    input[type="radio"] { transform: scale(1.2); }
+</style>
 {% endblock %}

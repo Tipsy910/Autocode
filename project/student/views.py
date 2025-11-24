@@ -290,4 +290,101 @@ def student_assignment_detail_view(request, pk):
         'questions': questions
     })
     
+@login_required
+def generate_quiz_view(request, pk):
+    submission = get_object_or_404(Submission, pk=pk)
+    assignment = submission.assignment # ดึง Assignment ออกมา
 
+    # 2. ป้องกันการสร้างซ้ำ (ถ้ามีแล้ว ให้ไปหน้าทำข้อสอบเลย)
+    if hasattr(submission, 'quiz_set'):
+        messages.info(request, "แบบทดสอบมีอยู่แล้ว")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    try:
+        # 👇 ดึงค่า Config จาก Assignment
+        n_questions = assignment.quiz_question_count
+        n_choices = assignment.quiz_choice_count
+
+        # 👇 ส่งค่าไปให้ฟังก์ชัน AI
+        questions_data = generate_quiz_with_ai(submission, n_questions, n_choices)
+        
+        if not questions_data:
+            raise Exception("AI ไม่ส่งข้อมูลกลับมา")
+
+        # บันทึกลง Database
+        with transaction.atomic():
+            quiz = Quiz.objects.create(submission=submission,total_questions=n_questions)
+            
+            for idx, q_data in enumerate(questions_data, 1):
+                question = QuizQuestion.objects.create(
+                    quiz=quiz,
+                    text=q_data['question_text'],
+                    order=idx
+                )
+                
+                # AI อาจจะส่งมาเกินหรือขาด เราต้องดักไว้ หรือ Loop ตามที่ AI ส่งมา
+                # แต่ถ้า AI ทำงานถูก มันจะส่งมาตามจำนวน n_choices
+                for c_data in q_data['choices']:
+                    QuizChoice.objects.create(
+                        question=question,
+                        text=c_data['text'],
+                        is_correct=c_data['is_correct']
+                    )
+            
+            submission.quiz_generated = True
+            submission.save()
+
+        messages.success(request, f"สร้างแบบทดสอบ {n_questions} ข้อเรียบร้อยแล้ว!")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        messages.error(request, "เกิดข้อผิดพลาดในการสร้างแบบทดสอบ")
+
+    return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+@login_required
+def take_quiz_view(request, pk):
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    # เช็คว่ามี Quiz หรือยัง
+    if not hasattr(submission, 'quiz'):
+        messages.error(request, "ยังไม่พบแบบทดสอบ กรุณาสร้างก่อน")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    quiz = submission.quiz
+
+    # ถ้าทำเสร็จแล้ว ไม่ให้ทำซ้ำ (หรือแล้วแต่ Logic คุณ)
+    if quiz.is_completed:
+        messages.info(request, "คุณทำแบบทดสอบนี้ไปแล้ว")
+        # อาจจะสร้างหน้า result แยก หรือส่งกลับไปหน้าเดิม
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    # --- กรณีส่งคำตอบ (POST) ---
+    if request.method == 'POST':
+        score = 0
+        total = quiz.questions.count()
+        
+        # วนลูปตรวจทีละข้อ
+        for question in quiz.questions.all():
+            # ชื่อ input ใน html คือ "question_ID"
+            selected_choice_id = request.POST.get(f'question_{question.id}')
+            
+            if selected_choice_id:
+                # หาตัวเลือกที่นร.เลือกมา
+                selected_choice = question.choices.filter(id=selected_choice_id).first()
+                if selected_choice and selected_choice.is_correct:
+                    score += 1
+        
+        # บันทึกคะแนน
+        quiz.score = score
+        quiz.is_completed = True
+        quiz.save()
+        
+        messages.success(request, f"สอบเสร็จสิ้น! คุณได้ {score} / {total} คะแนน")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    # --- กรณีเปิดหน้าสอบ (GET) ---
+    return render(request, 'student/take_quiz.html', {
+        'submission': submission,
+        'quiz': quiz
+    })

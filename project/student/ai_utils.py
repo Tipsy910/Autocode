@@ -255,7 +255,7 @@ def evaluate_submission_with_ai(submission):
         print(f"Processing Error: {e}")
         return 0, f"เกิดข้อผิดพลาดในการประมวลผล: {e}"
     
-def generate_quiz_with_ai(submission):
+def generate_quiz_with_ai(submission,num_questions, num_choices):
     assignment = submission.assignment
     student_code_parts = []
     
@@ -265,8 +265,11 @@ def generate_quiz_with_ai(submission):
         "Create a specialized quiz based on the student's code and the assignment description.",
         "The quiz should test if the student truly understands their own code and the concepts used.",
         "\n🔴 REQUIREMENTS:",
-        "1. Create exactly 5 Multiple Choice Questions.",
-        "2. Each question must have 4 choices.",
+        
+        # ✅ แก้ตรงนี้: เอาตัวแปรมาใส่แทนเลข 5 และ 4
+        f"1. Create exactly {num_questions} Multiple Choice Questions.",
+        f"2. Each question must have {num_choices} choices.",
+        
         "3. Only ONE choice is correct per question.",
         "4. Return strictly in JSON format matching the schema.",
         "5. Language: THAI (ภาษาไทย).",
