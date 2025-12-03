@@ -51,7 +51,7 @@
                     
                     <p class="mb-2 lead fw-bold">Feedback:</p>
                     <div class="card bg-light border-info p-3 lead shadow-sm" style="font-size: 0.95rem;"> 
-                        {{ submission.ai_feedback|linebreaks }}
+                        {{ submission.ai_feedback|safe}}
                     </div>
                 </div>
             {% endif %}
@@ -168,7 +168,7 @@
                                 {% if submission.quiz.is_completed %}
                                     <h2 class="text-success mb-0">{{ submission.quiz.score }} / {{ submission.quiz.total_questions }}</h2>
                                     <small class="text-muted">คะแนนของคุณ</small>
-                                    <a href="{% url 'student:take_quiz' submission.pk %}" class="btn btn-outline-dark w-100 mt-3 btn-sm">
+                                    <a href="{% url 'student:quiz_result' submission.pk %}" class="btn btn-outline-dark w-100 mt-3 btn-sm">
                                         ดูผลการสอบ
                                     </a>
                                 {% else %}

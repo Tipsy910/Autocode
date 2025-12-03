@@ -243,3 +243,11 @@ class QuizChoice(models.Model):
     def __str__(self):
         mark = "✅" if self.is_correct else ""
         return f"{mark} {self.text}"
+
+class QuizAnswer(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='student_answers')
+    question = models.ForeignKey(QuizQuestion, on_delete=models.CASCADE)
+    selected_choice = models.ForeignKey(QuizChoice, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Ans: {self.selected_choice} for {self.question}"
