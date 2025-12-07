@@ -11,4 +11,7 @@ urlpatterns = [
     path('room/<int:room_pk>/announce/', create_announcement, name='create_announcement'),
     path('announcement/<int:pk>/edit/', edit_announcement, name='announcement_edit'),
     path('announcement/<int:pk>/delete/', AnnouncementDeleteView.as_view(), name='announcement_delete'),
+    path('assignment/<int:pk>/submissions/', review_submission_view, name= 'review_submission'),
+    path('submission/<int:pk>/quiz-result/', teacher_quiz_result_view, name='quiz_result'),
+    path('assignment/<int:pk>/reported/', report_list_view, name='report_list'),
 ]

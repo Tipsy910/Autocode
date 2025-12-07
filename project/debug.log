@@ -1,0 +1,2 @@
+Action: approve, POST: <QueryDict: {'csrfmiddlewaretoken': ['JA3iOUzpSy9l801NC2kyZYeCDeUDHlmNM5r1FMr4tp3H9H7uW917Jch6nkFXRLTK'], 'teacher_comment': ['None'], 'action': ['approve']}>
+Action: approve, POST: <QueryDict: {'csrfmiddlewaretoken': ['xtuwI8h29Znop6AWnc3bO64D76fxoJjkAYSfz09HKQhKqNGDHjKKyk77Rc0Ry9Qh'], 'teacher_comment': ['None'], 'action': ['approve']}>

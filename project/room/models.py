@@ -88,6 +88,11 @@ class Assignment(models.Model):
         help_text="เลือกประเภทไฟล์ที่อนุญาตให้นักเรียนส่งสำหรับงานชิ้นนี้"
     )
     
+    enable_ai_quiz = models.BooleanField(
+        default=True, 
+        help_text="เปิดให้นักเรียนสร้างแบบทดสอบจาก AI หรือไม่"
+    )
+    
     author = models.ForeignKey(
     settings.AUTH_USER_MODEL,
     on_delete=models.SET_NULL,
@@ -108,6 +113,7 @@ class Submission(models.Model):
         related_name='submissions'
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
+    
     # 1. ระบุประเภทของการส่งงานครั้งนี้
     submission_type = models.ForeignKey(
         SubmissionType, 
@@ -116,6 +122,7 @@ class Submission(models.Model):
         null=True, # ตั้งเป็น null=True เพื่อให้ migration ผ่านได้ง่ายสำหรับข้อมูลเก่า
         blank=True
     )
+    
     # 2. เพิ่ม field ใหม่สำหรับเก็บลิงก์
     submitted_link = models.URLField(
         max_length=500, # เผื่อสำหรับ URL ยาวๆ
@@ -134,6 +141,25 @@ class Submission(models.Model):
     )
     quiz_generated = models.BooleanField(default=False)
     quiz_score = models.IntegerField(default=0, help_text="คะแนนที่นักเรียนทำได้จาก Quiz")
+    
+    # สถานะของงาน
+    STATUS_CHOICES = [
+        ('PENDING', 'รอส่ง/รอตรวจ'),
+        ('GRADED', 'AI ตรวจแล้ว (รออนุมัติ)'),
+        ('PASSED', 'ผ่านแล้ว (Approved)'),
+        ('REJECT', 'ส่งคืนให้แก้ไข (Revision)'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    
+    # การแจ้งปัญหาการตรวจจากนักเรียน
+    is_reported = models.BooleanField(default=False, help_text="นักเรียนกดแจ้งปัญหาการตรวจ")
+    report_reason = models.TextField(blank=True, null=True, help_text="เหตุผลที่แจ้งปัญหา")
+    
+    # ความเห็นจากอาจารย์ (Optional)
+    teacher_comment = models.TextField(blank=True, null=True, help_text="ความเห็นจากอาจารย์")
+    
+    # วันที่อาจารย์กดตรวจ
+    graded_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f'Submission by {self.student.username} for {self.assignment.title}'

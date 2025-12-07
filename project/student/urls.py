@@ -8,4 +8,5 @@ urlpatterns = [
     path('submission/<int:pk>/generate-quiz/', generate_quiz_view, name='generate_quiz'),
     path('submission/<int:pk>/take-quiz/', take_quiz_view, name='take_quiz'),
     path('submission/<int:pk>/quiz-result/', quiz_result_view, name='quiz_result'),
+    path('submission/<int:pk>/report/', report_ai_issue_view, name='report_ai_issue'),
 ]

@@ -294,6 +294,10 @@ def student_assignment_detail_view(request, pk):
 def generate_quiz_view(request, pk):
     submission = get_object_or_404(Submission, pk=pk)
     assignment = submission.assignment # ดึง Assignment ออกมา
+    
+    if not submission.assignment.enable_ai_quiz:
+        messages.error(request, "งานนี้อาจารย์ปิดระบบแบบทดสอบไว้")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
 
     # 2. ป้องกันการสร้างซ้ำ (ถ้ามีแล้ว ให้ไปหน้าทำข้อสอบเลย)
     if hasattr(submission, 'quiz_set'):
@@ -425,3 +429,27 @@ def quiz_result_view(request, pk):
         'questions': questions,
         'student_answers_dict': student_answers_dict
     })
+
+@login_required
+def report_ai_issue_view(request, pk):
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    # เช็คสิทธิ์ว่าเป็นเจ้าของงานจริงไหม
+    if submission.student != request.user:
+        messages.error(request, "คุณไม่มีสิทธิ์แจ้งปัญหาในงานนี้")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    if request.method == 'POST':
+        reason = request.POST.get('report_reason', '').strip()
+        
+        if reason:
+            submission.is_reported = True
+            submission.report_reason = reason
+            submission.save()
+            
+            messages.success(request, "แจ้งปัญหาเรียบร้อยแล้ว อาจารย์จะเข้ามาตรวจสอบเร็วๆ นี้")
+        else:
+            messages.warning(request, "กรุณาระบุเหตุผลในการแจ้งปัญหา")
+
+    return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
