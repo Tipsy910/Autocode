@@ -143,3 +143,17 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp-relay.brevo.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True  # Brevo แนะนำให้ใช้ TLS กับพอร์ต 587
+
+# ค่าเหล่านี้ควรดึงมาจาก os.environ หรือ .env เพื่อความปลอดภัย
+Brevo_api = os.getenv('BREVO_API_KEY')
+Brevo_login = os.getenv('BREVO_LOGIN')
+Brevo_default_email = os.getenv('BREVO_DEFAULT_EMAIL')
+
+
+EMAIL_HOST_USER = Brevo_login    # อีเมล Login ของ Brevo
+EMAIL_HOST_PASSWORD = Brevo_api # Key ที่ Gen มาตะกี้
+DEFAULT_FROM_EMAIL = Brevo_default_email
