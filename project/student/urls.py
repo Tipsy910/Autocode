@@ -1,8 +1,12 @@
 from django.urls import path
-from .views import student_dashboard, student_room_detail_view, student_assignment_detail_view
+from student.views import *
 app_name = 'student'
 urlpatterns = [
     path('dashboard/', student_dashboard.as_view(), name='dashboard'),
     path('room/<int:pk>/', student_room_detail_view, name='room_detail'),
-    path('assignment/<int:assignment_id>/', student_assignment_detail_view, name='student_assignment_detail'),
+    path('assignment/<int:pk>/', student_assignment_detail_view, name='assignment_detail'),
+    path('submission/<int:pk>/generate-quiz/', generate_quiz_view, name='generate_quiz'),
+    path('submission/<int:pk>/take-quiz/', take_quiz_view, name='take_quiz'),
+    path('submission/<int:pk>/quiz-result/', quiz_result_view, name='quiz_result'),
+    path('submission/<int:pk>/report/', report_ai_issue_view, name='report_ai_issue'),
 ]

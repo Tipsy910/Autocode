@@ -22,13 +22,15 @@ class AssignmentForm(forms.ModelForm):
         # 1. เพิ่ม 'score' และ 'allowed_submission_types' เข้าไปใน fields
         fields = [
             'title', 
-            'description', 
+            'description',
+            'problem_file',
             'due_date', 
             'score',  # <-- เพิ่มเข้ามา
             'allowed_submission_types', # <-- เพิ่มเข้ามา
             'test_case_file', 
             'quiz_question_count', 
-            'quiz_choice_count'
+            'quiz_choice_count',
+            'enable_ai_quiz'
         ]
         
         # 2. เพิ่ม Label ที่จะแสดงในฟอร์มสำหรับ field ใหม่
@@ -48,7 +50,11 @@ class AssignmentForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
             'score': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}), # <-- เพิ่มเข้ามา
             'allowed_submission_types': forms.CheckboxSelectMultiple, # <-- ใช้ Checkbox เพื่อให้เลือกง่าย
+            'problem_file': forms.FileInput(attrs={'class': 'form-control'}),
             'test_case_file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'enable_ai_quiz': forms.CheckboxInput(attrs={
+                'class': 'form-check-input', 
+                'role': 'switch',}),
             'quiz_question_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
             'quiz_choice_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '2'}),
         }

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load quiz_tags %} 
+{% block title %}ผลการสอบ - {{ submission.assignment.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            
+            <div class="card border-info shadow-sm mb-4">
+                <div class="card-body text-center p-4">
+                    <h5 class="text-muted">ผลการทดสอบ</h5>
+                    <h1 class="display-4 fw-bold {% if quiz.score >= quiz.total_questions|add:"-1" %}text-success{% else %}text-primary{% endif %}">
+                        {{ quiz.score }} / {{ quiz.total_questions }}
+                    </h1>
+                    <p class="mb-3">คะแนนของคุณ</p>
+                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>กลับหน้ารายละเอียดงาน
+                    </a>
+                </div>
+            </div>
+
+            {% for question in questions %}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="mb-0">
+                            <span class="badge bg-secondary me-2">ข้อที่ {{ question.order }}</span>
+                            {{ question.text }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            {% for choice in question.choices.all %}
+                                {% with user_selected_id=student_answers_dict|get_item:question.id %}
+                                    
+                                    {% if choice.is_correct %}
+                                        <div class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
+                                            <span>
+                                                <i class="fas fa-check-circle me-2"></i> {{ choice.text }}
+                                            </span>
+                                            <span class="badge bg-success">คำตอบที่ถูก</span>
+                                        </div>
+
+                                    {% elif choice.id == user_selected_id and not choice.is_correct %}
+                                        <div class="list-group-item list-group-item-danger d-flex justify-content-between align-items-center">
+                                            <span>
+                                                <i class="fas fa-times-circle me-2"></i> {{ choice.text }}
+                                            </span>
+                                            <span class="badge bg-danger">คุณเลือกข้อนี้</span>
+                                        </div>
+                                    
+                                    {% elif choice.id == user_selected_id and choice.is_correct %}
+                                         {% else %}
+                                        <div class="list-group-item text-muted">
+                                            <i class="far fa-circle me-2"></i> {{ choice.text }}
+                                        </div>
+                                    {% endif %}
+
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

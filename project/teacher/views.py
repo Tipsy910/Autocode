@@ -3,13 +3,12 @@ from django.urls import reverse_lazy, reverse
 from django.views import View
 from django.views.generic.edit import DeleteView 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
 from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
 from room.models import Room, generate_invite_code, Assignment,Submission,Announcement, AnnouncementFile
 from .forms import RoomForm, AssignmentForm, JoinRoomForm, AnnouncementForm
 from django.db.models import Q
-from django.contrib import messages 
+from django.contrib import messages
+from django.utils import timezone
 # Create your views here.
 
 
@@ -164,7 +163,6 @@ class RoomDeleteView(LoginRequiredMixin, DeleteView):
         context['page_title'] = f'ยืนยันการลบห้อง: {self.object.name}'
         return context
 
-    
 @login_required
 def create_announcement(request, room_pk):
     if request.method == 'POST':
@@ -233,11 +231,6 @@ def edit_announcement(request, pk):
     # ไม่ว่าจะสำเร็จหรือไม่ ก็กลับไปที่หน้าห้องเรียนเดิม
     return redirect('room:teacher_detail', pk=announcement.room.pk)
 
-
-
-
-
-
 @login_required
 def create_assignment(request, room_id):
     room = get_object_or_404(Room, pk=room_id)
@@ -279,8 +272,9 @@ def create_assignment(request, room_id):
 
 @login_required
 def teacher_assignment_detail(request, pk):
-    # 2. ดึงข้อมูล Assignment และตรวจสอบสิทธิ์ความเป็นเจ้าของ
+    # 1. ดึงข้อมูล Assignment และตรวจสอบสิทธิ์
     assignment = get_object_or_404(Assignment, pk=pk)
+    
     try:
         teacher_profile = request.user.teacher_profile
     except AttributeError:
@@ -289,24 +283,87 @@ def teacher_assignment_detail(request, pk):
     is_owner = (request.user == assignment.room.owner)
     is_teacher = assignment.room.teachers.filter(pk=teacher_profile.pk).exists()
     if not (is_owner or is_teacher):
-        # ถ้าไม่ใช่ทั้งเจ้าของและผู้สอนร่วม ก็ไม่มีสิทธิ์ดู
         return redirect('teacher:dashboard')
     
-    # 3. ดึงข้อมูลนักเรียนและการส่งงาน
-    students_in_room = assignment.room.students.all()
-    submissions = Submission.objects.filter(assignment=assignment)
+    # 2. ดึงนักเรียนทั้งหมดในห้อง (นี่คือตัวส่วน "ส่วน 2")
+    students_in_room = assignment.room.students.select_related('user').order_by('user__first_name')
     
-    # 4. จัดการข้อมูลเพื่อให้ง่ายต่อการแสดงผลใน Template
-    # สร้าง dict เพื่อให้ค้นหา submission ของนักเรียนแต่ละคนได้ง่าย
-    submission_map = {sub.student.id: sub for sub in submissions}
+    # 3. ดึงงานที่ส่งมาทั้งหมด
+    submissions = Submission.objects.filter(assignment=assignment).select_related('student', 'quiz')
+    submission_map = {sub.student.id: sub for sub in submissions} # Key คือ User ID
     
-    # สร้าง list ที่มีข้อมูลครบถ้วนสำหรับนักเรียนแต่ละคน
+    # 4. ตัวแปรเก็บสถิติ (เริ่มต้นเป็น 0)
+    stats = {
+        'total': students_in_room.count(), # จำนวนนักเรียนทั้งหมด
+        'submitted': 0, # ส่งแล้ว
+        'pending': 0,   # รอตรวจ
+        'passed': 0,    # ผ่านแล้ว
+        'reported': 0   # แจ้งปัญหา
+    }
+
     student_submissions = []
+    
+    # 5. วนลูปนักเรียนทีละคน (เพื่อความแม่นยำ)
     for student in students_in_room:
+        # ดึงงานส่งของนักเรียนคนนี้ (ถ้ามี)
+        submission = submission_map.get(student.user.id)
+        
+        display_status = 'MISSING' # ค่าเริ่มต้น
+        
+        if submission:
+            # ✅ ถ้านักเรียนคนนี้มีงานส่ง -> นับ +1 ทันที
+            stats['submitted'] += 1
+            
+            # เช็คสถานะย่อย
+            if submission.is_reported:
+                display_status = 'REPORTED'
+                stats['reported'] += 1
+                # (เคสแจ้งปัญหา ถือว่าส่งแล้ว แต่อาจจะไม่นับเป็น pending หรือ passed แล้วแต่คุณ)
+                
+            elif submission.status == 'PASSED':
+                display_status = 'PASSED'
+                stats['passed'] += 1
+                
+            elif submission.status == 'REJECT':
+                display_status = 'REJECT'
+                # (เคสโดนตีกลับ ก็ถือว่าส่งแล้ว -> submitted +1 แต่ยังไม่ passed)
+                
+            elif submission.ai_feedback or submission.is_graded:
+                display_status = 'WAITING_APPROVAL'
+                stats['pending'] += 1
+                
+            else:
+                display_status = 'SUBMITTED'
+                stats['pending'] += 1 # รอ AI ตรวจ ก็ถือว่า Pending
+        
+        # เก็บข้อมูลใส่ List
         student_submissions.append({
             'student': student,
-            'submission': submission_map.get(student.id) # จะได้ Submission object หรือ None
+            'submission': submission,
+            'display_status': display_status
         })
+
+    # เรียงลำดับ: แจ้งปัญหา > รอตรวจ > ส่งแล้ว > ผ่านแล้ว > ยังไม่ส่ง
+    status_priority = {
+        'REPORTED': 1,
+        'WAITING_APPROVAL': 2,
+        'SUBMITTED': 3,
+        'REJECT': 4,
+        'PASSED': 5,
+        'MISSING': 6
+    }
+    student_submissions.sort(key=lambda x: status_priority.get(x['display_status'], 99))
+
+    context = {
+        'assignment': assignment,
+        'student_submissions': student_submissions,
+        'stats': stats, # 👈 ส่งตัวแปรสถิติที่คำนวณใหม่ไปให้หน้าเว็บ
+    }
+    
+    return render(request, 'teacher/assignment_detail.html', context)
+    # เรียงลำดับ: เอาคนที่มีปัญหาขึ้นก่อน -> ตามด้วยคนที่ส่งแล้ว -> คนยังไม่ส่ง
+    # (Logic: REPORTED มาก่อนเพื่อน)
+    student_submissions.sort(key=lambda x: 0 if x['display_status'] == 'REPORTED' else 1)
 
     context = {
         'assignment': assignment,
@@ -345,8 +402,32 @@ def edit_assignment(request, pk):
         return redirect('teacher:assignment_detail', pk=assignment.pk)
 
     if request.method == 'POST':
+        # ✅ ถูกต้อง: มี request.FILES
         form = AssignmentForm(request.POST, request.FILES, instance=assignment)
+        
         if form.is_valid():
+            # ============================================================
+            # 🧹 ADD: เช็คว่ามีการอัปโหลดไฟล์ใหม่มาไหม? ถ้ามี ให้ลบอันเก่าทิ้ง
+            # ============================================================
+            
+            # 1. เช็คไฟล์โจทย์ (problem_file)
+            if 'problem_file' in request.FILES:
+                # ถ้ามีไฟล์เก่าอยู่ ให้ลบทิ้งก่อน
+                if assignment.problem_file:
+                    try:
+                        assignment.problem_file.delete(save=False)
+                    except:
+                        pass # ถ้าลบไม่ได้ (เช่นไฟล์หายไปแล้ว) ก็ปล่อยผ่าน
+
+            # 2. เช็คไฟล์เทสเคส (test_case_file)
+            if 'test_case_file' in request.FILES:
+                if assignment.test_case_file:
+                    try:
+                        assignment.test_case_file.delete(save=False)
+                    except:
+                        pass
+            # ============================================================
+
             form.save()
             messages.success(request, f"แก้ไขงาน '{assignment.title}' เรียบร้อยแล้ว")
             return redirect('teacher:assignment_detail', pk=assignment.pk)
@@ -358,3 +439,99 @@ def edit_assignment(request, pk):
         'assignment': assignment
     }
     return render(request, 'teacher/edit_assignment.html', context)
+
+
+@login_required
+def review_submission_view(request, pk):
+    # 1. ดึงข้อมูลงานส่ง (Submission)
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    # 2. เช็คสิทธิ์: คนดูต้องเป็นเจ้าของห้อง หรือครูผู้ช่วย
+    assignment = submission.assignment
+    if assignment.room.owner != request.user and not assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists():
+        # ถ้าไม่มีสิทธิ์ ดีดกลับไป Dashboard
+        return redirect('teacher:dashboard')
+
+    # 3. Logic การตรวจงาน (POST)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        comment = request.POST.get('teacher_comment', '')
+        ai_score = request.POST.get('ai_score')
+
+        submission.teacher_comment = comment
+        if ai_score:
+            submission.ai_score = int(ai_score)
+        
+        submission.graded_at = timezone.now()
+        
+        if action == 'approve':
+            submission.status = 'PASSED'
+            submission.is_reported = False
+        elif action == 'reject':
+            submission.status = 'REJECT'
+            submission.is_reported = False
+            
+        submission.save()
+        # บันทึกเสร็จ กลับไปหน้ารายชื่อนักเรียน
+        return redirect('teacher:assignment_detail', pk=assignment.pk)
+
+    # 4. ดึงข้อมูล Quiz (ถ้ามี)
+    quiz = getattr(submission, 'quiz', None)
+
+    return render(request, 'teacher/review_submission.html', {
+        'submission': submission,
+        'quiz': quiz
+    })
+
+@login_required
+def teacher_quiz_result_view(request, pk):
+    # 1. ดึงข้อมูล Submission
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    # 2. ตรวจสอบสิทธิ์ (เจ้าของห้อง หรือ ครูผู้ช่วย)
+    assignment = submission.assignment
+    if assignment.room.owner != request.user and not assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists():
+        messages.error(request, "คุณไม่มีสิทธิ์ดูผลสอบนี้")
+        return redirect('teacher:dashboard')
+
+    # 3. เช็คว่ามี Quiz ไหม
+    if not hasattr(submission, 'quiz'):
+        messages.warning(request, "นักเรียนยังไม่ได้ทำแบบทดสอบ")
+        return redirect('teacher:review_submission', pk=pk)
+
+    quiz = submission.quiz
+    questions = quiz.questions.prefetch_related('choices').all()
+    
+    # 4. ดึงคำตอบนักเรียนมา Map ใส่ Dict { question_id: choice_id }
+    student_answers_dict = {
+        ans.question.id: ans.selected_choice.id 
+        for ans in quiz.student_answers.all()
+    }
+
+    return render(request, 'teacher/quiz_result.html', {
+        'submission': submission,
+        'quiz': quiz,
+        'questions': questions,
+        'student_answers_dict': student_answers_dict
+    })
+
+@login_required
+def report_list_view(request, pk):
+    assignment = get_object_or_404(Assignment, pk=pk)
+    
+    # Check permissions
+    is_owner = (request.user == assignment.room.owner)
+    is_teacher = assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists()
+    if not (is_owner or is_teacher):
+        return redirect('teacher:dashboard')
+
+    # Filter only reported submissions
+    reported_submissions = Submission.objects.filter(
+        assignment=assignment, 
+        is_reported=True
+    ).select_related('student')
+
+    return render(request, 'teacher/report_list.html', {
+        'assignment': assignment,
+        'reported_submissions': reported_submissions
+    })

@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% load static %}
+{% load room_tags %} 
+
+{% block title %}{{ assignment.title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    
+    <div class="row g-5">
+        <div class="col-md-8">
+            <h1 class="display-6 border-bottom pb-3 mb-4">
+                <i class="fas fa-clipboard-list text-primary me-3"></i>{{ assignment.title }}
+            </h1>
+            <div class="text-muted mb-3">
+                <span>โพสต์โดย: {{ assignment.author.get_full_name|default:assignment.author.email }}</span>
+                <span class="mx-2">|</span>
+                <span>คะแนนเต็ม: {{ assignment.score|floatformat:0 }}</span>
+            </div>
+            
+            {% if assignment.description %}
+                <p class="lead">{{ assignment.description|linebreaksbr }}</p>
+            {% endif %}
+
+            {% if assignment.problem_file %}
+                <a href="{{ assignment.problem_file.url }}" class="list-group-item list-group-item-action mb-3" target="_blank">
+                    <i class="fas fa-file-pdf text-danger me-2"></i> 
+                    <strong>ไฟล์โจทย์หลัก</strong> (PDF/Image)
+                    <small class="ms-2 text-muted">(คลิกเพื่อเปิดในแท็บใหม่)</small>
+                </a>
+            {% endif %}
+
+            {% if assignment.test_case_file %}
+                <div class="mt-4 mb-4">
+                    <h5>ไฟล์ประกอบ:</h5>
+                    <a href="{{ assignment.test_case_file.url }}" class="btn btn-outline-secondary" download>
+                        <i class="fas fa-download me-2"></i>ดาวน์โหลด Test Case
+                    </a>
+                </div>
+            {% endif %}
+
+            {% if submission.ai_feedback %}
+                <hr class="my-4"> 
+                <div class="ai-feedback-section mt-3 position-relative"> <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="text-info mb-0"><i class="fas fa-robot me-2"></i> ผลการตรวจจาก AI</h3>
+                        
+                        <div>
+                            {% if submission.is_reported %}
+                                <span class="badge bg-danger text-white p-2">
+                                    <i class="fas fa-exclamation-circle me-1"></i> แจ้งตรวจสอบแล้ว
+                                </span>
+                            {% else %}
+                                <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#reportModal">
+                                    <i class="fas fa-flag me-1"></i> แจ้งปัญหาผลตรวจ
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-info text-dark me-2" style="font-size: 1.1em;">
+                            คะแนน AI: {{ submission.ai_score }} / {{ assignment.score }}
+                        </span>
+                    </div>
+                    
+                    <div class="card bg-light border-info p-3 lead shadow-sm" style="font-size: 0.95rem;"> 
+                        {{ submission.ai_feedback|safe }}
+                    </div>
+                </div>
+            {% endif %}
+
+
+            
+        </div>
+
+        <div class="col-md-4">
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                    <h5 class="mb-0">สถานะงาน</h5>
+                    
+                    {% if submission %}
+                        <span class="badge bg-success rounded-pill px-3">ส่งแล้ว</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark rounded-pill px-3">ยังไม่ได้ส่ง</span>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body">
+                    
+                    {% if submission %}
+                        <p class="small text-muted mb-1">ส่งเมื่อ:</p>
+                        <p class="fw-bold">{{ submission.submitted_at|date:"d F Y, H:i" }}</p>
+                        
+                        {% if submission.submission_type.identifier == 'URL' %}
+                            <p class="small text-muted mb-1">ลิงก์ที่ส่ง:</p>
+                            <p class="mb-2">
+                                <a href="{{ submission.submitted_link }}" target="_blank" class="text-decoration-none text-break">
+                                    <i class="fas fa-external-link-alt me-1"></i> เปิดลิงก์
+                                </a>
+                            </p>
+                        {% elif submission.files.all %}
+                            <p class="small text-muted mb-1">ไฟล์ที่ส่ง:</p>
+                            <ul class="list-unstyled mb-2 bg-light p-2 rounded">
+                                {% for s_file in submission.files.all %}
+                                    <li class="mb-1">
+                                        <a href="{{ s_file.file.url }}" target="_blank" class="text-decoration-none text-dark">
+                                            <i class="fas fa-file-code me-2 text-primary"></i>
+                                            {{ s_file.file.name | split_filename }}
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                        <hr>
+                        <div class="alert alert-light border small text-muted mb-3">
+                            <i class="fas fa-info-circle me-1"></i> หากต้องการส่งงานใหม่ สามารถส่งทับได้เลย
+                        </div>
+                    {% endif %}
+
+                    {% if allow_url_submission %}
+                        <div class="mb-3">
+                            <h6 class="fw-bold">ส่งด้วย Colab Link</h6>
+                            <form method="POST" action="">
+                                {% csrf_token %}
+                                {% if url_form.errors %}
+                                    <div class="alert alert-danger p-2 small mb-2">
+                                        {{ url_form.submitted_link.errors }}
+                                    </div>
+                                {% endif %}
+                                <div class="input-group">
+                                    {{ url_form.submitted_link }}
+                                    <button type="submit" name="submit_url" class="btn btn-outline-primary">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    {% endif %}
+                    
+                    {% if allow_file_submission %}
+                        <div class="mt-3">
+                            <h6 class="fw-bold">ส่งด้วยไฟล์ Python</h6>
+                            <form method="POST" action="" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <div class="mb-2">
+                                    <label for="{{ file_form.files.id_for_label }}" class="btn btn-outline-secondary w-100 text-start">
+                                        <i class="fas fa-folder-open me-2"></i> เลือกไฟล์...
+                                    </label>
+                                    <input type="file" name="{{ file_form.files.name }}" id="{{ file_form.files.id_for_label }}" class="d-none" multiple required>
+                                </div>
+
+                                <div id="file-list-preview" class="mb-2" style="display: none;">
+                                    <ul id="selected-files-list" class="list-group small"></ul>
+                                </div>
+                                
+                                <button type="submit" name="submit_file" class="btn btn-primary w-100">
+                                    <i class="fas fa-upload me-2"></i> อัปโหลดและส่งงาน
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="card-footer bg-light text-muted small text-center">
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    ครบกำหนด: {% if assignment.due_date %}<span class="text-danger fw-bold">{{ assignment.due_date|date:"d M H:i" }}</span>{% else %}ไม่มีกำหนด{% endif %}
+                </div>
+            </div>
+
+            {% if submission and submission.ai_feedback %}
+                <div class="card shadow-sm border-warning">
+                    <div class="card-header bg-warning text-dark fw-bold">
+                        <i class="fas fa-brain me-2"></i>AI Quiz Zone
+                    </div>
+                    <div class="card-body text-center">
+                        
+                        {% if submission.quiz_generated %}
+                            <div class="mb-3">
+                                <span class="badge bg-success mb-2">สร้างสำเร็จแล้ว</span>
+                                {% if submission.quiz.is_completed %}
+                                    <h2 class="text-success mb-0">{{ submission.quiz.score }} / {{ submission.quiz.total_questions }}</h2>
+                                    <small class="text-muted">คะแนนของคุณ</small>
+                                    <a href="{% url 'student:quiz_result' submission.pk %}" class="btn btn-outline-dark w-100 mt-3 btn-sm">
+                                        ดูผลการสอบ
+                                    </a>
+                                {% else %}
+                                    <p class="small text-muted mb-3">แบบทดสอบรอคุณอยู่</p>
+                                    <a href="{% url 'student:take_quiz' submission.pk %}" class="btn btn-success w-100 pulse-button">
+                                        <i class="fas fa-play me-2"></i> เริ่มสอบเลย
+                                    </a>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <p class="small text-muted mb-3">
+                                ทบทวนความรู้จากโค้ดที่คุณเพิ่งส่งไป ด้วยแบบทดสอบที่ AI สร้างให้
+                            </p>
+                            <form action="{% url 'student:generate_quiz' submission.pk %}" method="POST">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-dark w-100">
+                                    <i class="fas fa-magic me-2 text-warning"></i> สร้างแบบทดสอบ
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif submission %}
+                <div class="card shadow-sm bg-light border-0">
+                    <div class="card-body text-center py-4">
+                        <div class="spinner-border text-primary mb-2" role="status"></div>
+                        <p class="small text-muted mb-0">กำลังรอผลตรวจจาก AI...</p>
+                    </div>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const fileInput = document.getElementById('{{ file_form.files.id_for_label }}'); 
+        const previewContainer = document.getElementById('file-list-preview');
+        const fileListElement = document.getElementById('selected-files-list');
+
+        if(fileInput) {
+            fileInput.addEventListener('change', function(event) {
+                fileListElement.innerHTML = '';
+                const files = event.target.files;
+
+                if (files.length > 0) {
+                    previewContainer.style.display = 'block';
+                    for (let i = 0; i < files.length; i++) {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item d-flex justify-content-between align-items-center py-1';
+                        li.innerHTML = `<span class="text-truncate">${files[i].name}</span> <i class="fas fa-check text-success small"></i>`;
+                        fileListElement.appendChild(li);
+                    }
+                } else {
+                    previewContainer.style.display = 'none';
+                }
+            });
+        }
+    } catch (e) {
+        console.error("Error setting up file preview:", e);
+    }
+});
+</script>
+
+<style>
+/* CSS เล็กน้อยสำหรับ Animation ปุ่ม */
+.pulse-button {
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7); }
+    70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(25, 135, 84, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(25, 135, 84, 0); }
+}
+.hover-scale:hover {
+    transform: translateY(-2px);
+}
+</style>
+
+{% if submission %}
+
+    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#reportModal">
+        <i class="fas fa-flag me-1"></i> แจ้งปัญหา
+    </button>
+
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                
+                <form action="{% url 'student:report_ai_issue' submission.pk %}" method="POST">
+                    {% csrf_token %}
+                    
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title"><i class="fas fa-flag me-2"></i>แจ้งปัญหา AI</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">ระบุปัญหา:</label>
+                            <textarea name="report_reason" class="form-control" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                        <button type="submit" class="btn btn-danger">ยืนยัน</button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+{% endif %}
+{% endblock %}
