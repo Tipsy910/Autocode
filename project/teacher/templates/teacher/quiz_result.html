@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load quiz_tags %} 
+{% block title %}ผลสอบ (มุมมองอาจารย์) - {{ submission.student.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    
+    <a href="{% url 'teacher:review_submission' submission.pk %}" class="btn btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-left me-2"></i> กลับหน้าตรวจงาน
+    </a>
+
+    <div class="row justify-content-center">
+        <div class="col-md-9">
+            
+            <div class="card border-primary shadow-sm mb-4">
+                <div class="card-body text-center p-4">
+                    <h5 class="text-primary fw-bold"><i class="fas fa-chalkboard-teacher me-2"></i>ผลการทดสอบของนักเรียน</h5>
+                    <h3 class="mt-2">{{ submission.student.name }}</h3>
+                    <h1 class="display-4 fw-bold mt-3 {% if quiz.score >= quiz.total_questions|add:"-1" %}text-success{% else %}text-dark{% endif %}">
+                        {{ quiz.score }} / {{ quiz.total_questions }}
+                    </h1>
+                    <p class="text-muted">คะแนนที่ได้</p>
+                </div>
+            </div>
+
+            {% for question in questions %}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between">
+                        <h6 class="mb-0 fw-bold text-primary">ข้อที่ {{ forloop.counter }}</h6>
+                        {% with user_selected_id=student_answers_dict|get_item:question.id %}
+                            {% for choice in question.choices.all %}
+                                {% if choice.id == user_selected_id %}
+                                    {% if choice.is_correct %}
+                                        <span class="badge bg-success">ตอบถูก</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">ตอบผิด</span>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </div>
+                    
+                    <div class="card-body">
+                        <p class="lead mb-3">{{ question.text }}</p>
+
+                        <div class="list-group">
+                            {% for choice in question.choices.all %}
+                                {% with user_selected_id=student_answers_dict|get_item:question.id %}
+                                    
+                                    {% if choice.is_correct %}
+                                        <div class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
+                                            <span><i class="fas fa-check-circle me-2"></i> {{ choice.text }}</span>
+                                            <span class="badge bg-success">เฉลย</span>
+                                        </div>
+
+                                    {% elif choice.id == user_selected_id and not choice.is_correct %}
+                                        <div class="list-group-item list-group-item-danger d-flex justify-content-between align-items-center">
+                                            <span><i class="fas fa-times-circle me-2"></i> {{ choice.text }}</span>
+                                            <span class="badge bg-danger">นักเรียนตอบ</span>
+                                        </div>
+                                    
+                                    {% else %}
+                                        <div class="list-group-item list-group-item-action disabled text-muted">
+                                            <i class="far fa-circle me-2"></i> {{ choice.text }}
+                                        </div>
+                                    {% endif %}
+
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

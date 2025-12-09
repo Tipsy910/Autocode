@@ -25,7 +25,6 @@ def login_view(request):
             else:
                 return redirect('teacher:dashboard')
 
-
     return render(request, 'login/login.html')
 
 

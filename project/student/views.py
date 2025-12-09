@@ -294,6 +294,10 @@ def student_assignment_detail_view(request, pk):
 def generate_quiz_view(request, pk):
     submission = get_object_or_404(Submission, pk=pk)
     assignment = submission.assignment # ดึง Assignment ออกมา
+    
+    if not submission.assignment.enable_ai_quiz:
+        messages.error(request, "งานนี้อาจารย์ปิดระบบแบบทดสอบไว้")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
 
     # 2. ป้องกันการสร้างซ้ำ (ถ้ามีแล้ว ให้ไปหน้าทำข้อสอบเลย)
     if hasattr(submission, 'quiz_set'):
@@ -364,27 +368,88 @@ def take_quiz_view(request, pk):
         score = 0
         total = quiz.questions.count()
         
-        # วนลูปตรวจทีละข้อ
-        for question in quiz.questions.all():
-            # ชื่อ input ใน html คือ "question_ID"
-            selected_choice_id = request.POST.get(f'question_{question.id}')
-            
-            if selected_choice_id:
-                # หาตัวเลือกที่นร.เลือกมา
-                selected_choice = question.choices.filter(id=selected_choice_id).first()
-                if selected_choice and selected_choice.is_correct:
-                    score += 1
+        # ใช้ Transaction เพื่อความปลอดภัย
+        with transaction.atomic():
+            # ลบคำตอบเก่าทิ้งก่อน (กรณีเผื่อมีระบบสอบแก้ตัวในอนาคต)
+            QuizAnswer.objects.filter(quiz=quiz).delete()
+
+            for question in quiz.questions.all():
+                selected_choice_id = request.POST.get(f'question_{question.id}')
+                
+                if selected_choice_id:
+                    selected_choice = question.choices.filter(id=selected_choice_id).first()
+                    
+                    if selected_choice:
+                        # ✅ 1. บันทึกคำตอบที่นักเรียนเลือกลง DB
+                        QuizAnswer.objects.create(
+                            quiz=quiz,
+                            question=question,
+                            selected_choice=selected_choice
+                        )
+
+                        # ✅ 2. ตรวจว่าถูกไหม
+                        if selected_choice.is_correct:
+                            score += 1
         
-        # บันทึกคะแนน
+        # บันทึกคะแนนรวม
         quiz.score = score
         quiz.is_completed = True
         quiz.save()
         
         messages.success(request, f"สอบเสร็จสิ้น! คุณได้ {score} / {total} คะแนน")
+        # เปลี่ยน Redirect ไปหน้า Assignment Detail เหมือนเดิม
         return redirect('student:assignment_detail', pk=submission.assignment.pk)
-
     # --- กรณีเปิดหน้าสอบ (GET) ---
     return render(request, 'student/take_quiz.html', {
         'submission': submission,
         'quiz': quiz
     })
+
+@login_required
+def quiz_result_view(request, pk):
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    if not hasattr(submission, 'quiz') or not submission.quiz.is_completed:
+        messages.error(request, "คุณยังไม่ได้ทำแบบทดสอบ")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    quiz = submission.quiz
+    questions = quiz.questions.prefetch_related('choices').all()
+    
+    # ดึงคำตอบของนักเรียนมาเก็บใน Dictionary เพื่อให้ใช้ง่ายใน Template
+    # Format: { question_id: selected_choice_id }
+    student_answers_dict = {
+        ans.question.id: ans.selected_choice.id 
+        for ans in quiz.student_answers.all()
+    }
+
+    return render(request, 'student/quiz_result.html', {
+        'submission': submission,
+        'quiz': quiz,
+        'questions': questions,
+        'student_answers_dict': student_answers_dict
+    })
+
+@login_required
+def report_ai_issue_view(request, pk):
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    # เช็คสิทธิ์ว่าเป็นเจ้าของงานจริงไหม
+    if submission.student != request.user:
+        messages.error(request, "คุณไม่มีสิทธิ์แจ้งปัญหาในงานนี้")
+        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+
+    if request.method == 'POST':
+        reason = request.POST.get('report_reason', '').strip()
+        
+        if reason:
+            submission.is_reported = True
+            submission.report_reason = reason
+            submission.save()
+            
+            messages.success(request, "แจ้งปัญหาเรียบร้อยแล้ว อาจารย์จะเข้ามาตรวจสอบเร็วๆ นี้")
+        else:
+            messages.warning(request, "กรุณาระบุเหตุผลในการแจ้งปัญหา")
+
+    return redirect('student:assignment_detail', pk=submission.assignment.pk)
+

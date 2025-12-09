@@ -25,14 +25,13 @@
                         </div>
                         
                         <div class="mb-3">
-                        <label for="{{ form.problem_file.id_for_label }}" class="form-label">
-                            <i class="fas fa-file-pdf text-danger"></i> ไฟล์โจทย์ (PDF, PNG, JPG) (ถ้ามี)
-                        </label>
-                        
-                        {{ form.problem_file }}
-                        {% if form.problem_file.errors %}
-                            <div class="alert alert-danger p-1 small mt-1">{{ form.problem_file.errors }}</div>
-                        {% endif %}
+                            <label for="{{ form.problem_file.id_for_label }}" class="form-label">
+                                <i class="fas fa-file-pdf text-danger"></i> ไฟล์โจทย์ (PDF, PNG, JPG) (ถ้ามี)
+                            </label>
+                            {{ form.problem_file }}
+                            {% if form.problem_file.errors %}
+                                <div class="alert alert-danger p-1 small mt-1">{{ form.problem_file.errors }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="row">
@@ -45,7 +44,7 @@
                                 <label for="{{ form.score.id_for_label }}" class="form-label">{{ form.score.label }}</label>
                                 {{ form.score }}
                             </div>
-                            </div>
+                        </div>
 
                         <div class="mb-3">
                             <label class="form-label">{{ form.allowed_submission_types.label }}</label>
@@ -59,31 +58,50 @@
                                     </div>
                                 {% endfor %}
                             </div>
-                             <div class="form-text">{{ form.allowed_submission_types.help_text }}</div>
+                            <div class="form-text">{{ form.allowed_submission_types.help_text }}</div>
                         </div>
-                        <hr>
 
                         <div class="mb-3">
                             <label for="{{ form.test_case_file.id_for_label }}" class="form-label">{{ form.test_case_file.label }}</label>
                             {{ form.test_case_file }}
                             <div class="form-text">{{ form.test_case_file.help_text }}</div>
                         </div>
-                        <h5 class="mb-3">ตั้งค่าสำหรับ AI Quiz Generation</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.quiz_question_count.id_for_label }}" class="form-label">{{ form.quiz_question_count.label }}</label>
-                                {{ form.quiz_question_count }}
-                                <div class="form-text">{{ form.quiz_question_count.help_text }}</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.quiz_choice_count.id_for_label }}" class="form-label">{{ form.quiz_choice_count.label }}</label>
-                                {{ form.quiz_choice_count }}
-                                <div class="form-text">{{ form.quiz_choice_count.help_text }}</div>
+
+                        <hr>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch p-3 border border-warning rounded bg-light">
+                                {{ form.enable_ai_quiz }}
+                                <label class="form-check-label fw-bold ms-2" for="{{ form.enable_ai_quiz.id_for_label }}">
+                                    <i class="fas fa-magic text-warning me-1"></i> อนุญาตให้นักเรียนสร้าง AI Quiz
+                                </label>
+                                <div class="form-text ms-4 mt-1">
+                                    หากเปิด: นักเรียนสามารถกดให้ AI สร้างแบบทดสอบได้ <br>
+                                    หากปิด: นักเรียนจะส่งงานได้อย่างเดียว
+                                </div>
                             </div>
                         </div>
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <a href="{% url 'room:teacher_detail' pk=room.id %}" class="btn btn-secondary me-md-2">ยกเลิก</a>
+                        <div id="quiz-settings-area">
+                            <div class="card card-body bg-light border-0 mb-3">
+                                <h5 class="mb-3 text-primary"><i class="fas fa-cogs me-2"></i>ตั้งค่าสำหรับ AI Quiz Generation</h5>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.quiz_question_count.id_for_label }}" class="form-label">{{ form.quiz_question_count.label }}</label>
+                                        {{ form.quiz_question_count }}
+                                        <div class="form-text">{{ form.quiz_question_count.help_text }}</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.quiz_choice_count.id_for_label }}" class="form-label">{{ form.quiz_choice_count.label }}</label>
+                                        {{ form.quiz_choice_count }}
+                                        <div class="form-text">{{ form.quiz_choice_count.help_text }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap justify-content-md-end gap-2 mt-4">
+                            <a href="{% url 'room:teacher_detail' pk=room.id %}" class="btn btn-secondary">ยกเลิก</a>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-plus-circle me-2"></i>สร้างงาน
                             </button>
@@ -94,4 +112,27 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // อ้างอิง ID ของ Checkbox ที่ Django สร้างให้ (ใส่ใน template tag เพื่อความชัวร์)
+    const toggleSwitch = document.getElementById('{{ form.enable_ai_quiz.id_for_label }}');
+    const settingsArea = document.getElementById('quiz-settings-area');
+
+    function toggleSettings() {
+        if (toggleSwitch.checked) {
+            settingsArea.style.display = 'block'; // แสดง
+        } else {
+            settingsArea.style.display = 'none';  // ซ่อน
+        }
+    }
+
+    // เรียกทำงานครั้งแรก (เผื่อกรณีแก้ไขงาน แล้วค่าเดิมเป็น False)
+    if(toggleSwitch && settingsArea) {
+        toggleSettings();
+        // ดักจับเหตุการณ์เมื่อมีการคลิก
+        toggleSwitch.addEventListener('change', toggleSettings);
+    }
+});
+</script>
 {% endblock %}

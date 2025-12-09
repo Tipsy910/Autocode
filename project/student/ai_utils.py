@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 import re
 from google.api_core import retry
 from .ai_schemas import AiMultiFeedback, QuizSchema
+try:
+    from markdown import markdown as md_to_html
+except Exception:
+    md_to_html = None
 
 
 load_dotenv()
@@ -247,9 +251,16 @@ def evaluate_submission_with_ai(submission):
                     f"  {ftext}\n"
                     f"{'-' * 40}"
                 )
-
+        
         final_feedback_text = "\n".join(report_lines)
-        return total_score, final_feedback_text
+
+        # แปลง Markdown -> HTML (ถ้ามีไลบรารี markdown) หากไม่มีก็แปลงเป็น <br/> เป็น fallback
+        if md_to_html:
+            final_feedback_html = md_to_html(final_feedback_text)
+        else:
+            final_feedback_html = final_feedback_text.replace('\n', '<br/>')
+
+        return total_score, final_feedback_html
 
     except Exception as e:
         print(f"Processing Error: {e}")
