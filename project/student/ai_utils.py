@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import re
 from google.api_core import retry
 from .ai_schemas import AiMultiFeedback, QuizSchema
+
 try:
     from markdown import markdown as md_to_html
 except Exception:

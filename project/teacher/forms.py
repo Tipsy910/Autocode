@@ -30,7 +30,9 @@ class AssignmentForm(forms.ModelForm):
             'test_case_file', 
             'quiz_question_count', 
             'quiz_choice_count',
-            'enable_ai_quiz'
+            'enable_ai_quiz',
+            'allow_late_submission',
+            'quiz_time_limit',
         ]
         
         # 2. เพิ่ม Label ที่จะแสดงในฟอร์มสำหรับ field ใหม่
@@ -42,6 +44,7 @@ class AssignmentForm(forms.ModelForm):
             'test_case_file': 'ไฟล์ Test Case (สำหรับ AI)',
             'quiz_question_count': 'จำนวนคำถามที่ต้องการให้ AI สร้าง',
             'quiz_choice_count': 'จำนวนตัวเลือกต่อคำถาม',
+            'allow_late_submission': 'อนุญาตให้ส่งเกินเวลา',
         }
         
         # 3. กำหนด Widget สำหรับ field ใหม่ๆ และปรับของเก่าให้สวยงาม
@@ -57,6 +60,9 @@ class AssignmentForm(forms.ModelForm):
                 'role': 'switch',}),
             'quiz_question_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
             'quiz_choice_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '2'}),
+            'allow_late_submission': forms.CheckboxInput(attrs={
+                'class': 'form-check-input', 
+                'role': 'switch',}),
         }
 
 class JoinRoomForm(forms.Form):

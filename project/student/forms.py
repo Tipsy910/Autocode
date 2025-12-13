@@ -16,12 +16,26 @@ class URLSubmissionForm(forms.ModelForm):
             'submitted_link': 'ลิงก์ผลงาน (URL)'
         }
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True  # <--- บรรทัดนี้คือหัวใจสำคัญ แก้ ValueError
+
+# 2. สร้าง Field ใหม่เพื่อให้ Validate ผ่าน (Optional แต่แนะนำ)
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = single_file_clean(data, initial)
+        return result
+
+# 3. นำไปใช้ใน Form ของคุณ
 class FileSubmissionForm(forms.Form):
-    files = forms.FileField(
-        widget=forms.FileInput(attrs={
-            # 'multiple': True,  <--- ลบบรรทัดนี้ หรือคอมเมนต์ไว้
-            'class': 'form-control' # <--- เหลือไว้แค่ class
-        }),
-        required=True,
-        label="อัปโหลดไฟล์ (.py, .ipynb) (เลือกได้หลายไฟล์)"
+    files = MultipleFileField(  # <--- เปลี่ยนจาก forms.FileField เป็น MultipleFileField ที่เราสร้าง
+        label="อัปโหลดไฟล์ (.py, .ipynb) (เลือกได้หลายไฟล์)",
+        required=True
     )

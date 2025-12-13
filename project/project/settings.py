@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     'teacher.apps.TeacherConfig',
     'room.apps.RoomConfig',
     'student.apps.StudentConfig',
+    'django_extensions',
+    'notifications.apps.NotificationsConfig',
 ]
 
 MIDDLEWARE = [
@@ -71,6 +73,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'notifications.context_processors.notifications',
             ],
         },
     },
@@ -157,3 +160,5 @@ Brevo_default_email = os.getenv('BREVO_DEFAULT_EMAIL')
 EMAIL_HOST_USER = Brevo_login    # อีเมล Login ของ Brevo
 EMAIL_HOST_PASSWORD = Brevo_api # Key ที่ Gen มาตะกี้
 DEFAULT_FROM_EMAIL = Brevo_default_email
+
+BASE_URL = 'http://127.0.0.1:8000'

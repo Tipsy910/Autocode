@@ -4,11 +4,14 @@ from django.views import View
 from django.views.generic.edit import DeleteView 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from room.models import Room, generate_invite_code, Assignment,Submission,Announcement, AnnouncementFile
-from .forms import RoomForm, AssignmentForm, JoinRoomForm, AnnouncementForm
+from room.models import *
+from .forms import *
 from django.db.models import Q
 from django.contrib import messages
 from django.utils import timezone
+from datetime import timedelta
+from django.utils.html import strip_tags
+
 # Create your views here.
 
 
@@ -95,6 +98,7 @@ class teacher_dashboard(View):
             'join_form': join_form or JoinRoomForm(),
         }
         return render(request, self.template_name, context)
+
 @login_required
 def teacher_room_detail_view(request, pk):
     # 2. แก้ไข Query ให้ตรวจสอบทั้ง owner และ teachers
@@ -295,8 +299,8 @@ def teacher_assignment_detail(request, pk):
     # 4. ตัวแปรเก็บสถิติ (เริ่มต้นเป็น 0)
     stats = {
         'total': students_in_room.count(), # จำนวนนักเรียนทั้งหมด
-        'submitted': 0, # ส่งแล้ว
-        'pending': 0,   # รอตรวจ
+        'submitted': 0, # ส่งแล้ว (รวมทุกสถานะที่ส่งมา)
+        'pending': 0,   # รอตรวจ (รอ AI หรือ รอครูอนุมัติ)
         'passed': 0,    # ผ่านแล้ว
         'reported': 0   # แจ้งปัญหา
     }
@@ -308,40 +312,47 @@ def teacher_assignment_detail(request, pk):
         # ดึงงานส่งของนักเรียนคนนี้ (ถ้ามี)
         submission = submission_map.get(student.user.id)
         
-        display_status = 'MISSING' # ค่าเริ่มต้น
+        display_status = 'MISSING' # ค่าเริ่มต้น (ยังไม่ส่ง)
         
         if submission:
             # ✅ ถ้านักเรียนคนนี้มีงานส่ง -> นับ +1 ทันที
             stats['submitted'] += 1
             
-            # เช็คสถานะย่อย
+            # --- เช็คสถานะย่อย ---
+            
+            # 1. กรณีมีการแจ้งปัญหา (Report)
             if submission.is_reported:
                 display_status = 'REPORTED'
                 stats['reported'] += 1
-                # (เคสแจ้งปัญหา ถือว่าส่งแล้ว แต่อาจจะไม่นับเป็น pending หรือ passed แล้วแต่คุณ)
+                stats['pending'] += 1 # ถือว่าต้องรอครูเข้าไปดู
                 
+            # 2. กรณีผ่านแล้ว (Approved)
             elif submission.status == 'PASSED':
                 display_status = 'PASSED'
                 stats['passed'] += 1
                 
+            # 3. กรณีถูกส่งคืน (Reject/Revision)
             elif submission.status == 'REJECT':
                 display_status = 'REJECT'
-                # (เคสโดนตีกลับ ก็ถือว่าส่งแล้ว -> submitted +1 แต่ยังไม่ passed)
+                # ไม่นับเป็น pending หรือ passed เพราะถือว่าส่งกลับไปแล้ว
                 
-            elif submission.ai_feedback or submission.is_graded:
+            # 4. กรณี AI ตรวจแล้ว (รอครูอนุมัติ)
+            elif submission.status == 'GRADED': # <--- แก้ตรงนี้ (ใช้ status แทน is_graded)
                 display_status = 'WAITING_APPROVAL'
                 stats['pending'] += 1
                 
-            else:
+            # 5. กรณีเพิ่งส่ง (รอ AI ตรวจ)
+            else: # status == 'PENDING'
                 display_status = 'SUBMITTED'
                 stats['pending'] += 1 # รอ AI ตรวจ ก็ถือว่า Pending
         
-        # เก็บข้อมูลใส่ List
+        # เก็บข้อมูลเพื่อนำไปแสดงผลในตาราง
         student_submissions.append({
             'student': student,
             'submission': submission,
-            'display_status': display_status
+            'status': display_status
         })
+        
 
     # เรียงลำดับ: แจ้งปัญหา > รอตรวจ > ส่งแล้ว > ผ่านแล้ว > ยังไม่ส่ง
     status_priority = {
@@ -352,7 +363,7 @@ def teacher_assignment_detail(request, pk):
         'PASSED': 5,
         'MISSING': 6
     }
-    student_submissions.sort(key=lambda x: status_priority.get(x['display_status'], 99))
+    student_submissions.sort(key=lambda x: status_priority.get(x['status'], 99))
 
     context = {
         'assignment': assignment,
@@ -440,16 +451,18 @@ def edit_assignment(request, pk):
     }
     return render(request, 'teacher/edit_assignment.html', context)
 
-
 @login_required
 def review_submission_view(request, pk):
-    # 1. ดึงข้อมูลงานส่ง (Submission)
+    # 1. ดึงข้อมูลงานส่ง
     submission = get_object_or_404(Submission, pk=pk)
     
     # 2. เช็คสิทธิ์: คนดูต้องเป็นเจ้าของห้อง หรือครูผู้ช่วย
     assignment = submission.assignment
-    if assignment.room.owner != request.user and not assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists():
-        # ถ้าไม่มีสิทธิ์ ดีดกลับไป Dashboard
+    is_owner = assignment.room.owner == request.user
+    is_ta = hasattr(request.user, 'teacher_profile') and assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists()
+    
+    if not is_owner and not is_ta:
+        messages.error(request, "คุณไม่มีสิทธิ์ตรวจงานนี้")
         return redirect('teacher:dashboard')
 
     # 3. Logic การตรวจงาน (POST)
@@ -458,24 +471,108 @@ def review_submission_view(request, pk):
         comment = request.POST.get('teacher_comment', '')
         ai_score = request.POST.get('ai_score')
 
+        # อัปเดตข้อมูลพื้นฐาน (คะแนน AI และคอมเมนต์)
         submission.teacher_comment = comment
         if ai_score:
             submission.ai_score = int(ai_score)
         
         submission.graded_at = timezone.now()
+        submission.is_reported = False # รีเซ็ตสถานะการรายงาน (ถ้ามี)
         
+# ========================================================
+        # ✅ CASE 1: อนุมัติ (APPROVE) -> ให้ผ่าน + ส่งเมลแจ้งข่าวดี
+        # ========================================================
         if action == 'approve':
-            submission.status = 'PASSED'
-            submission.is_reported = False
+            submission.status = 'PASSED' 
+            
+            # --- เตรียมส่งอีเมล (เพิ่มใหม่) ---
+            student_email = submission.student.user.email
+            assignment_url = request.build_absolute_uri(
+                reverse('student:assignment_detail', args=[submission.assignment.id])
+            )
+
+            context = {
+                'student_name': submission.student.name,
+                'assignment_title': submission.assignment.title,
+                'ai_score': submission.ai_score,
+                'teacher_comment': comment,
+                'action_url': assignment_url,
+            }
+
+            html_message = render_to_string('teacher/emails/approve_submission.html', context)
+            plain_message = strip_tags(html_message)
+            subject = f"✅ ยินดีด้วย! งาน '{submission.assignment.title}' ผ่านการตรวจสอบแล้ว"
+
+            try:
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[student_email],
+                    html_message=html_message,
+                    fail_silently=True
+                )
+                messages.success(request, f"บันทึกผล 'ผ่าน' และแจ้งเตือนนักเรียนเรียบร้อย (คะแนน: {submission.ai_score})")
+            except Exception as e:
+                print(f"❌ Email Error: {e}")
+                messages.warning(request, "บันทึกสถานะผ่านแล้ว แต่ส่งอีเมลไม่สำเร็จ")
+            
+        # ========================================================
+        # ❌ CASE 2: ส่งคืน (REJECT) -> ให้แก้ + ส่งเมล
+        # ========================================================
         elif action == 'reject':
             submission.status = 'REJECT'
-            submission.is_reported = False
             
+            # --- 2.1 ล้างบาง Quiz (สำคัญมาก) ---
+            submission.quiz_generated = False
+            if hasattr(submission, 'quiz'):
+                submission.quiz.delete()
+                print(f"🗑️ Deleted Quiz for submission {submission.id}")
+            
+            # --- 2.2 เตรียมส่งอีเมลแจ้งเตือน (HTML Email) ---
+            student_email = submission.student.user.email
+            
+            # สร้าง URL ลิงก์กลับไปหน้างานของนักเรียน
+            assignment_url = request.build_absolute_uri(
+                reverse('student:assignment_detail', args=[submission.assignment.id])
+            )
+
+            # ข้อมูลที่จะส่งไปใน Template
+            context = {
+                'student_name': submission.student.name, # หรือ submission.student.user.get_full_name()
+                'assignment_title': submission.assignment.title,
+                'teacher_comment': comment,
+                'action_url': assignment_url,
+            }
+
+            # เรนเดอร์ HTML เป็น String
+            html_message = render_to_string('teacher/emails/reject_submission.html', context)
+            plain_message = strip_tags(html_message) # สร้าง Text ธรรมดาเผื่อไว้
+
+            subject = f"⚠️ งาน '{submission.assignment.title}' ถูกส่งคืนให้แก้ไข"
+            
+            try:
+                send_mail(
+                    subject=subject,
+                    message=plain_message,      # ข้อความล้วน
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[student_email],
+                    html_message=html_message,  # ✅ ข้อความ HTML
+                    fail_silently=True
+                )
+                messages.warning(request, "บันทึกสถานะ 'ส่งคืน' และแจ้งเตือนนักเรียนทางเมลเรียบร้อยแล้ว")
+            except Exception as e:
+                print(f"❌ Email Error: {e}")
+                messages.warning(request, "บันทึกสถานะแล้ว แต่ส่งเมลแจ้งเตือนไม่สำเร็จ")
+                
+        # บันทึกข้อมูลลงฐานข้อมูล
         submission.save()
-        # บันทึกเสร็จ กลับไปหน้ารายชื่อนักเรียน
+        
+        # บันทึกเสร็จ กลับไปหน้ารายละเอียดงาน (รายชื่อนักเรียน)
         return redirect('teacher:assignment_detail', pk=assignment.pk)
 
-    # 4. ดึงข้อมูล Quiz (ถ้ามี)
+    # 4. กรณี GET (เปิดหน้าตรวจงาน)
+    # ส่งข้อมูล Quiz ไปด้วยเผื่ออาจารย์อยากดู (ถ้ามี)
     quiz = getattr(submission, 'quiz', None)
 
     return render(request, 'teacher/review_submission.html', {

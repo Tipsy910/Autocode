@@ -60,6 +60,7 @@ class Assignment(models.Model):
     description = models.TextField(blank=True, null=True)
     due_date = models.DateTimeField(blank=True, null=True)
     score = models.FloatField(blank=True, null=True)
+    allow_late_submission = models.BooleanField(default=False, verbose_name="อนุญาตให้ส่งเกินเวลา")
 
     # --- ส่วนตั้งค่าสำหรับ AI Quiz Generation ---
     test_case_file = models.FileField(
@@ -99,8 +100,14 @@ class Assignment(models.Model):
     null=True,
     related_name='created_assignments')
 
-
+    
     created_at = models.DateTimeField(auto_now_add=True)
+
+    quiz_time_limit = models.PositiveIntegerField(
+        default=10, 
+        verbose_name="เวลาทำแบบทดสอบ (นาที)",
+        help_text="ระบุเวลาเป็นนาที (เช่น 15)"
+    )
 
     def __str__(self):
         return self.title
@@ -219,12 +226,15 @@ class Quiz(models.Model):
     # วันที่สร้างควิซ
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # เก็บเวลาที่นักเรียนเริ่มกดทำ
+    started_at = models.DateTimeField(null=True, blank=True)
+
     # คะแนนที่ทำได้จริง (เช่น สอบได้ 4)
     score = models.IntegerField(default=0, help_text="คะแนนที่นักเรียนทำได้")
     
     # คะแนนเต็ม/จำนวนข้อทั้งหมด (เช่น เต็ม 5) -> สำคัญมาก เอาไว้คำนวณเกรด
     total_questions = models.IntegerField(default=0, help_text="จำนวนข้อสอบทั้งหมดในชุดนี้")
-    
+
     # สถานะว่าทำเสร็จหรือยัง (True = ส่งกระดาษคำตอบแล้ว)
     is_completed = models.BooleanField(default=False)
 

@@ -11,6 +11,7 @@ from student.forms import URLSubmissionForm, FileSubmissionForm
 from django.contrib import messages
 from .ai_utils import *
 from django.db import transaction
+from datetime import timedelta
 
 
 class student_dashboard(LoginRequiredMixin, View):
@@ -120,13 +121,19 @@ def student_assignment_detail_view(request, pk):
     # 1. ดึงข้อมูล Assignment
     assignment = get_object_or_404(Assignment, pk=pk)
     user = request.user
-
+    
+    allowed_types_list = assignment.allowed_submission_types.values_list('identifier', flat=True)
+    allow_file_submission = 'FILE' in allowed_types_list or 'PY' in allowed_types_list
+    allow_url_submission = 'URL' in allowed_types_list
+    
     # 2. ตรวจสอบว่า User เป็นนักเรียนจริงหรือไม่
     try:
+        if not hasattr(user, 'student_profile'):
+             raise Students.DoesNotExist
         student_profile = user.student_profile
     except Students.DoesNotExist:
         messages.error(request, 'บัญชีของคุณไม่ใช่บัญชีนักเรียน')
-        return redirect('student:dashboard') # หรือหน้าอื่นที่เหมาะสม
+        return redirect('student:dashboard')
 
     # 3. ตรวจสอบสิทธิ์ว่านักเรียนอยู่ในห้องเรียนนี้หรือไม่
     if student_profile not in assignment.room.students.all():
@@ -136,11 +143,58 @@ def student_assignment_detail_view(request, pk):
     # 4. ดึง Submission เดิม (ถ้าเคยส่งแล้ว)
     submission = Submission.objects.filter(student=user, assignment=assignment).first()
 
-    # =========================================================
+    quiz = None  # <--- ประกาศค่าเริ่มต้นเป็น None ไว้ก่อน (สำคัญมาก!)
+    
+    if submission and hasattr(submission, 'quiz'):
+        try:
+            # พยายามดึงข้อมูล quiz ออกมาใส่ตัวแปร
+            quiz = submission.quiz
+        except Exception:
+            # กันเหนียว: กรณีมี relation แต่หา object ไม่เจอ
+            quiz = None
+
+    # LOGIC ควบคุมสิทธิ์การส่งงาน (เพิ่มใหม่)
+    now = timezone.now()
+    is_overdue = now > assignment.due_date
+    
+
+    # ตรวจสอบว่าเคยทำ Quiz หรือยัง (เช็คจาก submission.quiz หรือ flag ที่คุณใช้)
+    has_done_quiz = False
+    if quiz:    # <--- ใช้ตัวแปร quiz ที่ประกาศไว้ได้เลย
+        has_done_quiz = True
+
+
+    can_submit = True
+    disable_reason = ""
+
+    # เงื่อนไขที่ 1: ทำ Quiz ไปแล้ว -> ปิดถาวร
+    if has_done_quiz:
+        can_submit = False
+        disable_reason = "คุณทำแบบทดสอบเสร็จสิ้นแล้ว ไม่สามารถแก้ไขงานได้อีก"
+    
+    # เงื่อนไขที่ 2: งานผ่านแล้ว (PASSED) -> ปิด
+    elif submission and submission.status == 'PASSED':
+        can_submit = False
+        disable_reason = "งานนี้ผ่านการตรวจสอบแล้ว"
+
+    # เงื่อนไขที่ 3: เลยกำหนดส่ง และ ไม่อนุญาตให้ส่งช้า
+    elif is_overdue and not assignment.allow_late_submission:
+        # ข้อยกเว้น: ถ้าสถานะเป็น REJECT (ให้แก้) ต้องยอมให้ส่งใหม่ได้เสมอ แม้จะเลยเวลา
+        if submission and submission.status == 'REJECT':
+            can_submit = True 
+        else:
+            can_submit = False
+            disable_reason = "หมดเวลาส่งงานแล้ว (ไม่อนุญาตให้ส่งล่าช้า)"
+
     # 🛑 HANDLE POST REQUEST (การส่งงาน)
-    # =========================================================
+
     if request.method == 'POST':
-        # ใช้ Transaction เพื่อความปลอดภัยของข้อมูล (ถ้า Error ให้ Rollback ทั้งหมด)
+        # เช็คสิทธิ์ก่อนเริ่ม Process (กันคนยิง API เข้ามา)
+        if not can_submit:
+            messages.error(request, f"ไม่สามารถส่งงานได้: {disable_reason}")
+            return redirect('student:assignment_detail', pk=pk)
+
+        # ใช้ Transaction เพื่อความปลอดภัยของข้อมูล
         try:
             with transaction.atomic():
                 # สร้างหรือดึง Submission Object
@@ -150,6 +204,14 @@ def student_assignment_detail_view(request, pk):
                 )
                 submission.submitted_at = timezone.now()
                 
+                # เช็ค Late Submission
+                if is_overdue and assignment.allow_late_submission:
+                    submission.is_late = True # ถ้า Model มี field นี้
+                
+                # ถ้าเป็นการส่งแก้ (Reject) เปลี่ยนสถานะกลับเป็น Pending หรือ Graded
+                if submission.status == 'REJECT':
+                    submission.status = 'PENDING' # หรือสถานะรอตรวจ
+
                 form_valid = False
                 
                 # --- กรณี A: ส่งแบบ URL (Colab) ---
@@ -168,15 +230,24 @@ def student_assignment_detail_view(request, pk):
                 # --- กรณี B: ส่งแบบ File Upload ---
                 elif 'submit_file' in request.POST:
                     file_form = FileSubmissionForm(request.POST, request.FILES)
-                    # หมายเหตุ: file_form อาจจะไม่ต้อง bind instance ก็ได้ถ้าเราจัดการไฟล์เอง
                     if file_form.is_valid():
-                        submission.submission_type = SubmissionType.objects.get(identifier='PY')
-                        submission.submitted_link = None # ล้าง Link เก่าทิ้ง
+                        uploaded_files = request.FILES.getlist('files')
+                        
+                        # --- ลบ Logic เก่าที่แยก IPYNB/PY ออก ---
+                        # first_filename = uploaded_files[0].name.lower()
+                        # if first_filename.endswith('.ipynb'): ... (ลบทิ้ง)
+                        
+                        # --- ใส่บรรทัดนี้แทนครับ ---
+                        # เรียกใช้ Type 'FILE' ตัวเดียวกับที่คุณสร้างใน Admin (รูปที่ 1)
+                        submission.submission_type = SubmissionType.objects.get(identifier='FILE')
+                        
+                        submission.submitted_link = None 
+                        submission.submitted_at = timezone.now()
                         submission.save()
 
-                        # ลบไฟล์เก่าแล้วบันทึกไฟล์ใหม่
-                        submission.files.all().delete()
-                        for f in request.FILES.getlist('files'):
+                        # --- ลบไฟล์เก่าและบันทึกไฟล์ใหม่ ---
+                        submission.files.all().delete() 
+                        for f in uploaded_files:
                             SubmissionFile.objects.create(submission=submission, file=f)
                         
                         form_valid = True
@@ -222,102 +293,65 @@ def student_assignment_detail_view(request, pk):
     
     # 1. เตรียม Form (ถ้ามี submission เดิม ให้โหลดค่ามาใส่)
     url_form = URLSubmissionForm(instance=submission) if submission and submission.submission_type and submission.submission_type.identifier == 'URL' else URLSubmissionForm()
-    file_form = FileSubmissionForm() # File form มักจะไม่ pre-fill ไฟล์กลับเข้าไป
+    file_form = FileSubmissionForm() 
 
     # 2. เช็คว่า Assignment นี้อนุญาตให้ส่งแบบไหนบ้าง (เพื่อไปคุม Frontend)
-    allowed_types = assignment.allowed_submission_types.all()
-    allowed_identifiers = {t.identifier for t in allowed_types}
+
 
     context = {
         'assignment': assignment,
         'submission': submission,
+        'quiz': quiz,
         'url_form': url_form,
         'file_form': file_form,
-        'allow_url_submission': 'URL' in allowed_identifiers,
-        'allow_file_submission': 'PY' in allowed_identifiers or 'IPYNB' in allowed_identifiers,
+        'allow_url_submission': allow_url_submission,
+        'allow_file_submission': allow_file_submission,
+        # ส่งตัวแปรควบคุมสิทธิ์ไปหน้า HTML
+        'can_submit': can_submit,
+        'disable_reason': disable_reason,
+        'is_overdue': is_overdue,
+        'has_done_quiz': has_done_quiz
     }
 
     return render(request, 'student/assignment_detail.html', context)
-
-    # 1. ดึงข้อมูล Submission และคำถามที่เกี่ยวข้อง
-    submission = get_object_or_404(Submission, pk=pk, user=request.user)
-    questions = submission.generated_questions.all().order_by('order')
-    
-    if not questions:
-        # ถ้าไม่มีควิซ ให้เด้งกลับไปหน้างาน
-        return redirect('student:assignment_detail', pk=submission.assignment.pk)
-
-    # --- กรณีส่งคำตอบ (POST) ---
-    if request.method == 'POST':
-        score = 0
-        total_questions = questions.count()
-        results = [] # เก็บผลลัพธ์ไว้โชว์ว่าข้อไหนถูก/ผิด
-
-        for question in questions:
-            # ชื่อ field ใน html คือ "question_ID"
-            selected_choice_id = request.POST.get(f'question_{question.id}')
-            
-            is_correct = False
-            correct_choice = question.choices.filter(is_correct=True).first()
-            
-            if selected_choice_id:
-                selected_choice = GeneratedChoice.objects.filter(id=selected_choice_id).first()
-                if selected_choice and selected_choice.is_correct:
-                    score += 1
-                    is_correct = True
-            
-            results.append({
-                'question': question,
-                'is_correct': is_correct,
-                'correct_choice': correct_choice
-            })
-
-        # (Optional) คุณอาจจะอยากบันทึกคะแนน Quiz ลง Database ตรงนี้
-        # submission.quiz_score = score 
-        # submission.save()
-
-        # ส่งผลลัพธ์ไปหน้า Result
-        return render(request, 'student/quiz_result.html', {
-            'submission': submission,
-            'score': score,
-            'total': total_questions,
-            'results': results
-        })
-
-    # --- กรณีเปิดหน้าเว็บ (GET) ---
-    return render(request, 'student/take_quiz.html', {
-        'submission': submission,
-        'questions': questions
-    })
     
 @login_required
 def generate_quiz_view(request, pk):
     submission = get_object_or_404(Submission, pk=pk)
-    assignment = submission.assignment # ดึง Assignment ออกมา
+    assignment = submission.assignment
     
-    if not submission.assignment.enable_ai_quiz:
+    # 1. เช็คสิทธิ์ต่างๆ
+    if submission.status != 'PASSED':
+        messages.error(request, "ไม่สามารถสร้างแบบทดสอบได้ งานยังไม่ได้รับการอนุมัติ")
+        return redirect('student:assignment_detail', pk=assignment.pk)
+    
+    if not assignment.enable_ai_quiz:
         messages.error(request, "งานนี้อาจารย์ปิดระบบแบบทดสอบไว้")
-        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+        return redirect('student:assignment_detail', pk=assignment.pk)
 
-    # 2. ป้องกันการสร้างซ้ำ (ถ้ามีแล้ว ให้ไปหน้าทำข้อสอบเลย)
-    if hasattr(submission, 'quiz_set'):
-        messages.info(request, "แบบทดสอบมีอยู่แล้ว")
-        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+    # 2. ป้องกันการสร้างซ้ำ (ใช้ filter.exists() ชัวร์สุด)
+    if Quiz.objects.filter(submission=submission).exists():
+        messages.info(request, "แบบทดสอบมีอยู่แล้ว กำลังพาไปหน้าทำแบบทดสอบ...")
+        # Redirect ไปหน้าทำข้อสอบ (สมมติชื่อ url คือ student:take_quiz)
+        return redirect('student:take_quiz', pk=submission.pk)
 
     try:
         # 👇 ดึงค่า Config จาก Assignment
         n_questions = assignment.quiz_question_count
         n_choices = assignment.quiz_choice_count
 
-        # 👇 ส่งค่าไปให้ฟังก์ชัน AI
+        # 👇 เรียก AI (ฟังก์ชันนี้อาจใช้เวลา 5-10 วินาที)
         questions_data = generate_quiz_with_ai(submission, n_questions, n_choices)
         
         if not questions_data:
-            raise Exception("AI ไม่ส่งข้อมูลกลับมา")
+            raise Exception("AI ไม่สามารถสร้างคำถามได้ (ข้อมูลว่างเปล่า)")
 
-        # บันทึกลง Database
+        # 3. บันทึกลง Database (Atomic)
         with transaction.atomic():
-            quiz = Quiz.objects.create(submission=submission,total_questions=n_questions)
+            quiz = Quiz.objects.create(
+                submission=submission,
+                total_questions=len(questions_data) # ใช้จำนวนจริงที่ AI ส่งมา
+            )
             
             for idx, q_data in enumerate(questions_data, 1):
                 question = QuizQuestion.objects.create(
@@ -326,8 +360,7 @@ def generate_quiz_view(request, pk):
                     order=idx
                 )
                 
-                # AI อาจจะส่งมาเกินหรือขาด เราต้องดักไว้ หรือ Loop ตามที่ AI ส่งมา
-                # แต่ถ้า AI ทำงานถูก มันจะส่งมาตามจำนวน n_choices
+                # Loop สร้างตัวเลือก
                 for c_data in q_data['choices']:
                     QuizChoice.objects.create(
                         question=question,
@@ -335,74 +368,107 @@ def generate_quiz_view(request, pk):
                         is_correct=c_data['is_correct']
                     )
             
+            # อัปเดตสถานะ Submission (ถ้ามีฟิลด์นี้)
             submission.quiz_generated = True
             submission.save()
-
-        messages.success(request, f"สร้างแบบทดสอบ {n_questions} ข้อเรียบร้อยแล้ว!")
+        
+        messages.success(request, "สร้างแบบทดสอบสำเร็จ! เริ่มทำข้อสอบได้เลย")
+        return redirect('student:take_quiz', pk=submission.pk)
 
     except Exception as e:
-        print(f"Error: {e}")
-        messages.error(request, "เกิดข้อผิดพลาดในการสร้างแบบทดสอบ")
-
-    return redirect('student:assignment_detail', pk=submission.assignment.pk)
+        # ⚠️ ดักจับ Error แล้วแจ้งเตือนแทนการปล่อยจอขาว
+        print(f"Error generating quiz: {e}") # ปริ้นท์ลง console ไว้อ่านตอน debug
+        messages.error(request, f"เกิดข้อผิดพลาดในการสร้างแบบทดสอบ: {str(e)}")
+        return redirect('student:assignment_detail', pk=assignment.pk)
 
 @login_required
 def take_quiz_view(request, pk):
     submission = get_object_or_404(Submission, pk=pk)
-    
-    # เช็คว่ามี Quiz หรือยัง
+    assignment = submission.assignment
+
+    # 🔴 [แก้ไข 1] เช็คว่ามี Quiz หรือยัง "ก่อน" ที่จะดึงตัวแปร quiz
+    # ใช้ getattr เพื่อความปลอดภัย หรือเช็ค hasattr ก่อน
     if not hasattr(submission, 'quiz'):
         messages.error(request, "ยังไม่พบแบบทดสอบ กรุณาสร้างก่อน")
-        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+        return redirect('student:assignment_detail', pk=assignment.pk)
 
+    # เมื่อมั่นใจว่ามี Quiz ค่อยดึงมาใช้
     quiz = submission.quiz
 
-    # ถ้าทำเสร็จแล้ว ไม่ให้ทำซ้ำ (หรือแล้วแต่ Logic คุณ)
+    # เช็คว่าทำเสร็จไปแล้วหรือยัง
     if quiz.is_completed:
         messages.info(request, "คุณทำแบบทดสอบนี้ไปแล้ว")
-        # อาจจะสร้างหน้า result แยก หรือส่งกลับไปหน้าเดิม
-        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+        return redirect('student:assignment_detail', pk=assignment.pk)
+
+    # 1. ถ้าเพิ่งเข้าครั้งแรก ให้บันทึกเวลาเริ่ม
+    if not quiz.started_at:
+        quiz.started_at = timezone.now()
+        quiz.save()
+    
+    # 2. คำนวณเวลาหมดเขต (End Time)
+    end_time = quiz.started_at + timedelta(minutes=assignment.quiz_time_limit)
+    
+    # 3. คำนวณเวลาที่เหลือ
+    now = timezone.now()
+    remaining_time = (end_time - now).total_seconds()
+    
+    if remaining_time < 0:
+        remaining_time = 0
 
     # --- กรณีส่งคำตอบ (POST) ---
     if request.method == 'POST':
+        # 🔴 [แก้ไข 2] Server-side Time Check: ป้องกันการโกงเวลา
+        # เผื่อเวลาให้ Network Delay สัก 60 วินาที (buffer)
+        if now > (end_time + timedelta(seconds=60)):
+            messages.error(request, "หมดเวลาส่งข้อสอบแล้ว! ระบบไม่บันทึกคะแนน")
+            return redirect('student:assignment_detail', pk=assignment.pk)
+
         score = 0
-        total = quiz.questions.count()
+        # ใช้ related_name หรือ query ให้ถูกต้อง
+        questions = quiz.questions.all() 
+        total = questions.count()
         
-        # ใช้ Transaction เพื่อความปลอดภัย
         with transaction.atomic():
-            # ลบคำตอบเก่าทิ้งก่อน (กรณีเผื่อมีระบบสอบแก้ตัวในอนาคต)
+            # ลบคำตอบเก่าทิ้งก่อน (กรณี Re-submit หรือ Logic อื่นๆ)
             QuizAnswer.objects.filter(quiz=quiz).delete()
 
-            for question in quiz.questions.all():
+            for question in questions:
                 selected_choice_id = request.POST.get(f'question_{question.id}')
                 
                 if selected_choice_id:
+                    # filter ด้วย question เพื่อมั่นใจว่า Choice นี้เป็นของคำถามข้อนี้จริงๆ (กันมั่ว)
                     selected_choice = question.choices.filter(id=selected_choice_id).first()
                     
                     if selected_choice:
-                        # ✅ 1. บันทึกคำตอบที่นักเรียนเลือกลง DB
+                        # 1. บันทึกคำตอบ
                         QuizAnswer.objects.create(
                             quiz=quiz,
                             question=question,
                             selected_choice=selected_choice
                         )
 
-                        # ✅ 2. ตรวจว่าถูกไหม
+                        # 2. ตรวจคะแนน
                         if selected_choice.is_correct:
                             score += 1
         
-        # บันทึกคะแนนรวม
+        # บันทึกผลลัพธ์ลง Quiz
         quiz.score = score
         quiz.is_completed = True
         quiz.save()
         
+        # (Optional) ถ้าคุณมี field เก็บ status ใน Submission อาจจะอัปเดตตรงนี้ด้วยก็ได้
+        # submission.quiz_score = score
+        # submission.save()
+        
         messages.success(request, f"สอบเสร็จสิ้น! คุณได้ {score} / {total} คะแนน")
-        # เปลี่ยน Redirect ไปหน้า Assignment Detail เหมือนเดิม
-        return redirect('student:assignment_detail', pk=submission.assignment.pk)
+        return redirect('student:assignment_detail', pk=assignment.pk)
+
     # --- กรณีเปิดหน้าสอบ (GET) ---
     return render(request, 'student/take_quiz.html', {
         'submission': submission,
-        'quiz': quiz
+        'quiz': quiz,
+        'questions': quiz.questions.all(),
+        'remaining_time': remaining_time,
     })
 
 @login_required

@@ -3,7 +3,30 @@
 {% block title %}ทำแบบทดสอบ - {{ submission.assignment.title }}{% endblock %}
 
 {% block content %}
-<div class="container mt-5 mb-5">
+
+<div class="sticky-top bg-white border-bottom shadow-sm py-2 mb-4" style="z-index: 1020; top: 0;">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-clock fa-2x text-danger me-2 animate__animated animate__pulse animate__infinite"></i>
+                <div>
+                    <small class="text-muted d-block" style="line-height: 1;">เวลาที่เหลือ</small>
+                    <span id="timer-display" class="h4 fw-bold text-danger mb-0">--:--</span>
+                </div>
+            </div>
+            <div>
+                <span class="badge bg-warning text-dark d-none d-md-inline-block">
+                    <i class="fas fa-exclamation-triangle me-1"></i> ห้ามรีเฟรชหน้าจอ
+                </span>
+            </div>
+        </div>
+        <div class="progress mt-2" style="height: 4px;">
+            <div id="timer-progress" class="progress-bar bg-danger" role="progressbar" style="width: 100%;"></div>
+        </div>
+    </div>
+</div>
+
+<div class="container mb-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
             
@@ -18,7 +41,7 @@
                 </div>
             </div>
 
-            <form method="POST" action="">
+            <form id="quiz-form" method="POST" action="">
                 {% csrf_token %}
                 
                 {% for question in quiz.questions.all %}
@@ -48,7 +71,7 @@
                     <button type="submit" class="btn btn-success btn-lg py-3" onclick="return confirm('ยืนยันการส่งคำตอบ?');">
                         <i class="fas fa-paper-plane me-2"></i> ส่งกระดาษคำตอบ
                     </button>
-                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-outline-secondary">
+                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-outline-secondary btn-sm">
                         ยกเลิก / กลับไปหน้างาน
                     </a>
                 </div>
@@ -59,9 +82,82 @@
 </div>
 
 <style>
-    /* CSS เสริมให้คลิกง่ายขึ้น */
+    /* CSS เดิมของคุณ */
     .cursor-pointer { cursor: pointer; }
     .list-group-item:hover { background-color: #f8f9fa; }
     input[type="radio"] { transform: scale(1.2); }
+    
+    /* เพิ่ม Animation เล็กน้อย */
+    .timer-warning {
+        animation: blink 1s infinite;
+        color: red;
+    }
+    @keyframes blink {
+        50% { opacity: 0.5; }
+    }
 </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // รับค่าเวลาจาก Django (หน่วยวินาที)
+        let timeLeft = parseFloat("{{ remaining_time }}");
+        const initialTime = timeLeft; // เก็บค่าเริ่มต้นไว้คำนวณ Progress Bar
+
+        const timerDisplay = document.getElementById('timer-display');
+        const progressBar = document.getElementById('timer-progress');
+        const quizForm = document.getElementById('quiz-form');
+
+        // ฟังก์ชันแปลงวินาทีเป็น MM:SS
+        function formatTime(seconds) {
+            let m = Math.floor(seconds / 60);
+            let s = Math.floor(seconds % 60);
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        const timerInterval = setInterval(function() {
+            // 1. อัปเดตตัวเลข
+            timerDisplay.textContent = formatTime(timeLeft);
+
+            // 2. อัปเดต Progress Bar
+            let percentage = (timeLeft / initialTime) * 100;
+            progressBar.style.width = percentage + "%";
+
+            // เปลี่ยนสีตามเวลาที่เหลือ
+            if (percentage < 20) {
+                progressBar.className = "progress-bar bg-danger";
+                timerDisplay.classList.add("timer-warning"); // กระพริบเตือน
+            } else if (percentage < 50) {
+                progressBar.className = "progress-bar bg-warning";
+            } else {
+                progressBar.className = "progress-bar bg-success";
+            }
+
+            // 3. ตรวจสอบว่าหมดเวลาหรือยัง
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = "00:00";
+                progressBar.style.width = "0%";
+
+                // แจ้งเตือนและส่งฟอร์ม
+                Swal.fire({
+                    title: 'หมดเวลา!',
+                    text: 'ระบบกำลังส่งคำตอบของคุณอัตโนมัติ...',
+                    icon: 'warning',
+                    timer: 3000,
+                    showConfirmButton: false
+                }).then(() => {
+                    quizForm.submit();
+                });
+                
+                // Fallback เผื่อ SweetAlert ไม่ทำงาน
+                setTimeout(() => quizForm.submit(), 3000);
+            }
+
+            timeLeft--;
+        }, 1000); // ทำงานทุก 1 วินาที
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 {% endblock %}
