@@ -11,6 +11,8 @@ from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
 from django.utils.html import strip_tags
+from django.template.loader import render_to_string
+from django.core.mail import send_mail
 
 # Create your views here.
 
@@ -530,7 +532,7 @@ def review_submission_view(request, pk):
                 print(f"🗑️ Deleted Quiz for submission {submission.id}")
             
             # --- 2.2 เตรียมส่งอีเมลแจ้งเตือน (HTML Email) ---
-            student_email = submission.student.user.email
+            student_email = submission.student.email
             
             # สร้าง URL ลิงก์กลับไปหน้างานของนักเรียน
             assignment_url = request.build_absolute_uri(
@@ -539,7 +541,7 @@ def review_submission_view(request, pk):
 
             # ข้อมูลที่จะส่งไปใน Template
             context = {
-                'student_name': submission.student.name, # หรือ submission.student.user.get_full_name()
+                'student_name': submission.student.get_full_name(), # หรือ submission.student.user.get_full_name()
                 'assignment_title': submission.assignment.title,
                 'teacher_comment': comment,
                 'action_url': assignment_url,
