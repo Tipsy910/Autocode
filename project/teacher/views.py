@@ -488,13 +488,13 @@ def review_submission_view(request, pk):
             submission.status = 'PASSED' 
             
             # --- เตรียมส่งอีเมล (เพิ่มใหม่) ---
-            student_email = submission.student.user.email
+            student_email = submission.student.email
             assignment_url = request.build_absolute_uri(
                 reverse('student:assignment_detail', args=[submission.assignment.id])
             )
 
             context = {
-                'student_name': submission.student.name,
+                'student_name': submission.student.get_full_name(),
                 'assignment_title': submission.assignment.title,
                 'ai_score': submission.ai_score,
                 'teacher_comment': comment,

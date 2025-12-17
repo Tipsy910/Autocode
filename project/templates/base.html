@@ -18,7 +18,8 @@
             </button>
 
             <div class="collapse navbar-collapse" id="navbarNavDropdown">
-                <ul class="navbar-nav ms-auto align-items-center"> {% if user.is_authenticated %}
+                <ul class="navbar-nav ms-auto align-items-center"> 
+                    {% if user.is_authenticated %}
                         
                         <li class="nav-item dropdown me-3">
                             <a class="nav-link position-relative" href="#" id="notiDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -35,17 +36,24 @@
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="notiDropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
                                 <li><h6 class="dropdown-header border-bottom">การแจ้งเตือน</h6></li>
                                 
-                                {% if unread_notifications %}
-                                    {% for noti in unread_notifications %}
+                                {% if navbar_notifications %}
+                                    {% for noti in navbar_notifications %}
                                         <li>
-                                            <a class="dropdown-item p-3 border-bottom d-flex align-items-start" href="{% url 'notifications:mark_as_read' noti.id %}" style="white-space: normal;">
+                                            <a class="dropdown-item p-3 border-bottom d-flex align-items-start {% if not noti.is_read %}bg-light{% endif %}" 
+                                               href="{{ noti.link }}" 
+                                               style="white-space: normal;">
+                                                
                                                 <div class="me-3 mt-1">
-                                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                                    <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                                         style="width: 32px; height: 32px; background-color: {% if not noti.is_read %}#e7f1ff; color: #0d6efd;{% else %}#f8f9fa; color: #6c757d;{% endif %}">
                                                         <i class="fas fa-book small"></i>
                                                     </div>
                                                 </div>
+                                                
                                                 <div class="flex-grow-1">
-                                                    <p class="mb-1 small fw-bold text-dark">{{ noti.message }}</p>
+                                                    <p class="mb-1 small text-dark {% if not noti.is_read %}fw-bold{% endif %}">
+                                                        {{ noti.message }}
+                                                    </p>
                                                     <small class="text-muted" style="font-size: 0.75rem;">
                                                         <i class="far fa-clock me-1"></i>{{ noti.created_at|timesince }} ที่แล้ว
                                                     </small>
@@ -53,10 +61,13 @@
                                             </a>
                                         </li>
                                     {% endfor %}
+                                    
+                                    <li><a class="dropdown-item text-center small text-primary py-2" href="#">ดูทั้งหมด</a></li>
+
                                 {% else %}
                                     <li class="p-4 text-center text-muted">
                                         <i class="far fa-bell-slash fa-2x mb-2 text-secondary opacity-50"></i>
-                                        <p class="small mb-0">ไม่มีการแจ้งเตือนใหม่</p>
+                                        <p class="small mb-0">ไม่มีการแจ้งเตือน</p>
                                     </li>
                                 {% endif %}
                             </ul>
