@@ -35,6 +35,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     'anymail',
     'users.apps.UsersConfig',
     'login.apps.LoginConfig',
+    'import_export',
     'teacher.apps.TeacherConfig',
     'room.apps.RoomConfig',
     'student.apps.StudentConfig',
@@ -162,3 +164,52 @@ EMAIL_HOST_PASSWORD = Brevo_api # Key ที่ Gen มาตะกี้
 DEFAULT_FROM_EMAIL = Brevo_default_email
 
 BASE_URL = 'http://127.0.0.1:8000'
+
+
+
+JAZZMIN_SETTINGS = {
+    # 1. ตั้งชื่อระบบให้ดูโปร
+    "site_title": "Classroom Admin",
+    "site_header": "ระบบจัดการห้องเรียน",
+    "site_brand": "Autocode Grade",
+    "welcome_sign": "ยินดีต้อนรับสู่ระบบจัดการการเรียนการสอน",
+    "copyright": "Autocode Grade",
+
+    # 2. จัดลำดับแอป (เอา Room ขึ้นก่อน Users)
+    "order_with_respect_to": [
+        "room",            # เอาแอป Room (ห้องเรียน/งาน) ขึ้นก่อน
+        "users",           # ตามด้วย Users (นักเรียน/อาจารย์)
+        "auth",            # ระบบจัดการสิทธิ์ไว้ล่างสุด
+    ],
+
+    # 3. ใส่ไอคอนสวยๆ (ใช้ FontAwesome Free)
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+        
+        # App: Users
+        "users.Students": "fas fa-user-graduate", # 🎓 รูปนักเรียนรับปริญญา
+        "users.Teachers": "fas fa-chalkboard-teacher", # 👨‍🏫 รูปครูหน้ากระดาน
+        "users.Users": "fas fa-id-card",
+        
+        # App: Room
+        "room.Room": "fas fa-school",             # 🏫 รูปโรงเรียน
+        "room.Assignment": "fas fa-book-open",    # 📖 รูปหนังสือเปิด
+        "room.SubmissionType": "fas fa-file-code", # 📄 รูปไฟล์โค้ด
+    },
+
+    # 4. เมนู Top bar (ทางลัด)
+    "topmenu_links": [
+        {"name": "Home",  "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "ดูหน้าเว็บจริง (View Site)", "url": "/", "new_window": True}, # ลิงก์ไปหน้าเว็บหลัก
+    ],
+
+    # 5. เปิดระบบค้นหาแบบ Global (ค้นหาทีเดียวเจอทั้งนักเรียนและห้องเรียน)
+    "search_model": ["users.Students", "room.Room", "room.Assignment"],
+
+    # UI Customizer (ปิดไว้ตอนใช้งานจริง)
+    "show_ui_builder": True,
+}
+
+# Jazzmin UI Tweaks (ปรับสีและธีม)

@@ -88,6 +88,10 @@ class Students(models.Model):
         blank=True                          # อนุญาตให้เว้นว่างในฟอร์ม
     )
 
+    class Meta:
+        verbose_name = "Student"          # ชื่อเรียกแบบ 1 คน
+        verbose_name_plural = "Students"  # ชื่อเรียกแบบหลายคน (จะโชว์ใน Admin) 
+
     def __str__(self):
         return f"{self.user.email} - {self.user.personal_id or 'no-id'}"
 
@@ -101,6 +105,10 @@ class Teachers(models.Model):
         null=True,
         blank=True
     )
+    
+    class Meta:
+        verbose_name = "Teacher"
+        verbose_name_plural = "Teachers"
 
     def __str__(self):
         return f"{self.user.email} - {self.user.personal_id or 'no-id'}"

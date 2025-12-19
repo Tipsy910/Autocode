@@ -5,6 +5,12 @@ class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
         fields = ['name','cover_image']
+    
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        if not name or name.strip() == "":
+            raise forms.ValidationError("ชื่อห้องเรียนต้องไม่ใช่ช่องว่างอย่างเดียว")
+        return name
 
 class AssignmentForm(forms.ModelForm):
     # กำหนด widget สำหรับ due_date แยกต่างหากเพื่อให้ปรับแต่งได้ง่าย
@@ -82,3 +88,28 @@ class AnnouncementForm(forms.ModelForm):
         labels = {
             'content': '' # ไม่ต้องแสดง Label
         }
+
+# teacher/forms.py
+
+class GradingForm(forms.Form):
+    # ของเดิมที่มีอยู่
+    score = forms.FloatField(
+        label="คะแนน AI", 
+        required=False, 
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.5'})
+    )
+    
+    # ✅ เพิ่มส่วนนี้: สำหรับแก้ไขคะแนน Quiz
+    quiz_score = forms.FloatField(
+        label="คะแนน Quiz", 
+        required=False, 
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'})
+    )
+
+    feedback = forms.CharField(
+        label="ความเห็นอาจารย์",
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4})
+    )

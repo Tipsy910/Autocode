@@ -122,16 +122,14 @@ def student_assignment_detail_view(request, pk):
     assignment = get_object_or_404(Assignment, pk=pk)
     user = request.user
     
-    allowed_types_list = assignment.allowed_submission_types.values_list('identifier', flat=True)
-    allow_file_submission = 'FILE' in allowed_types_list or 'PY' in allowed_types_list
-    allow_url_submission = 'URL' in allowed_types_list
-    
     # 2. ตรวจสอบว่า User เป็นนักเรียนจริงหรือไม่
     try:
+        # เช็คชื่อ Model ดีๆ ว่าเป็น Student หรือ Students
         if not hasattr(user, 'student_profile'):
-             raise Students.DoesNotExist
+             # สมมติว่า Model ชื่อ Student
+             raise Student.DoesNotExist 
         student_profile = user.student_profile
-    except Students.DoesNotExist:
+    except Exception: # ดัก Exception กว้างๆ ไว้ก่อนกรณีหา Model ไม่เจอ
         messages.error(request, 'บัญชีของคุณไม่ใช่บัญชีนักเรียน')
         return redirect('student:dashboard')
 
@@ -140,44 +138,35 @@ def student_assignment_detail_view(request, pk):
         messages.error(request, 'คุณไม่มีสิทธิ์เข้าถึงงานนี้ (ไม่อยู่ในห้องเรียน)')
         return redirect('student:dashboard')
 
+    # เตรียมตัวแปรเพื่อเช็คประเภทการส่ง (สำหรับ Frontend)
+    allowed_types_list = assignment.allowed_submission_types.values_list('identifier', flat=True)
+    allow_file_submission = 'FILE' in allowed_types_list or 'PY' in allowed_types_list
+    allow_url_submission = 'URL' in allowed_types_list
+
     # 4. ดึง Submission เดิม (ถ้าเคยส่งแล้ว)
     submission = Submission.objects.filter(student=user, assignment=assignment).first()
 
-    quiz = None  # <--- ประกาศค่าเริ่มต้นเป็น None ไว้ก่อน (สำคัญมาก!)
-    
+    # จัดการ Quiz Object แบบปลอดภัย
+    quiz = None 
     if submission and hasattr(submission, 'quiz'):
-        try:
-            # พยายามดึงข้อมูล quiz ออกมาใส่ตัวแปร
-            quiz = submission.quiz
-        except Exception:
-            # กันเหนียว: กรณีมี relation แต่หา object ไม่เจอ
-            quiz = None
+        quiz = getattr(submission, 'quiz', None)
 
-    # LOGIC ควบคุมสิทธิ์การส่งงาน (เพิ่มใหม่)
+    # =========================================================
+    # 🛑 LOGIC ควบคุมสิทธิ์การส่งงาน
+    # =========================================================
     now = timezone.now()
     is_overdue = now > assignment.due_date
-    
-
-    # ตรวจสอบว่าเคยทำ Quiz หรือยัง (เช็คจาก submission.quiz หรือ flag ที่คุณใช้)
-    has_done_quiz = False
-    if quiz:    # <--- ใช้ตัวแปร quiz ที่ประกาศไว้ได้เลย
-        has_done_quiz = True
-
+    has_done_quiz = True if quiz and quiz.is_completed else False # เช็คเพิ่มว่า is_completed ไหม
 
     can_submit = True
     disable_reason = ""
 
-    # เงื่อนไขที่ 1: ทำ Quiz ไปแล้ว -> ปิดถาวร
-    if has_done_quiz:
-        can_submit = False
-        disable_reason = "คุณทำแบบทดสอบเสร็จสิ้นแล้ว ไม่สามารถแก้ไขงานได้อีก"
-    
-    # เงื่อนไขที่ 2: งานผ่านแล้ว (PASSED) -> ปิด
-    elif submission and submission.status == 'PASSED':
+    # เงื่อนไขที่ 1: งานผ่านแล้ว (PASSED) -> ปิด
+    if submission and submission.status == 'PASSED':
         can_submit = False
         disable_reason = "งานนี้ผ่านการตรวจสอบแล้ว"
 
-    # เงื่อนไขที่ 3: เลยกำหนดส่ง และ ไม่อนุญาตให้ส่งช้า
+    # เงื่อนไขที่ 2: เลยกำหนดส่ง และ ไม่อนุญาตให้ส่งช้า (และไม่ใช่การแก้ตัว)
     elif is_overdue and not assignment.allow_late_submission:
         # ข้อยกเว้น: ถ้าสถานะเป็น REJECT (ให้แก้) ต้องยอมให้ส่งใหม่ได้เสมอ แม้จะเลยเวลา
         if submission and submission.status == 'REJECT':
@@ -185,16 +174,19 @@ def student_assignment_detail_view(request, pk):
         else:
             can_submit = False
             disable_reason = "หมดเวลาส่งงานแล้ว (ไม่อนุญาตให้ส่งล่าช้า)"
+    
+    # เงื่อนไขที่ 3: (Optional) ถ้าทำ Quiz ไปแล้วอาจจะห้ามส่งใหม่
+    # if has_done_quiz: ...
 
-    # 🛑 HANDLE POST REQUEST (การส่งงาน)
-
+    # =========================================================
+    # 📤 HANDLE POST REQUEST (การส่งงาน)
+    # =========================================================
     if request.method == 'POST':
-        # เช็คสิทธิ์ก่อนเริ่ม Process (กันคนยิง API เข้ามา)
+        # เช็คสิทธิ์ก่อนเริ่ม Process
         if not can_submit:
             messages.error(request, f"ไม่สามารถส่งงานได้: {disable_reason}")
             return redirect('student:assignment_detail', pk=pk)
 
-        # ใช้ Transaction เพื่อความปลอดภัยของข้อมูล
         try:
             with transaction.atomic():
                 # สร้างหรือดึง Submission Object
@@ -202,28 +194,29 @@ def student_assignment_detail_view(request, pk):
                     student=user, 
                     assignment=assignment
                 )
+
+                # อัปเดตเวลาส่ง
                 submission.submitted_at = timezone.now()
                 
                 # เช็ค Late Submission
-                if is_overdue and assignment.allow_late_submission:
-                    submission.is_late = True # ถ้า Model มี field นี้
+                if is_overdue:
+                    submission.is_late = True
                 
-                # ถ้าเป็นการส่งแก้ (Reject) เปลี่ยนสถานะกลับเป็น Pending หรือ Graded
-                if submission.status == 'REJECT':
-                    submission.status = 'PENDING' # หรือสถานะรอตรวจ
-
+                # ✅ รีเซ็ตสถานะเป็น "WAITING" เพื่อรอตรวจใหม่
+                submission.status = 'WAITING'
+                submission.is_graded = False  # Reset flag การตรวจ
+                
                 form_valid = False
                 
-                # --- กรณี A: ส่งแบบ URL (Colab) ---
+                # --- กรณี A: ส่งแบบ URL ---
                 if 'submit_url' in request.POST:
                     url_form = URLSubmissionForm(request.POST, instance=submission)
                     if url_form.is_valid():
                         sub_instance = url_form.save(commit=False)
-                        # ต้องมั่นใจว่ามี Type 'URL' ใน DB
                         sub_instance.submission_type = SubmissionType.objects.get(identifier='URL')
                         sub_instance.save()
                         
-                        # ล้างไฟล์เก่าทิ้ง (เพราะส่งแบบ URL แทนแล้ว)
+                        # ล้างไฟล์เก่าทิ้ง
                         sub_instance.files.all().delete()
                         form_valid = True
 
@@ -233,19 +226,12 @@ def student_assignment_detail_view(request, pk):
                     if file_form.is_valid():
                         uploaded_files = request.FILES.getlist('files')
                         
-                        # --- ลบ Logic เก่าที่แยก IPYNB/PY ออก ---
-                        # first_filename = uploaded_files[0].name.lower()
-                        # if first_filename.endswith('.ipynb'): ... (ลบทิ้ง)
-                        
-                        # --- ใส่บรรทัดนี้แทนครับ ---
-                        # เรียกใช้ Type 'FILE' ตัวเดียวกับที่คุณสร้างใน Admin (รูปที่ 1)
+                        # Save Submission Type ก่อน
                         submission.submission_type = SubmissionType.objects.get(identifier='FILE')
-                        
                         submission.submitted_link = None 
-                        submission.submitted_at = timezone.now()
-                        submission.save()
+                        submission.save() 
 
-                        # --- ลบไฟล์เก่าและบันทึกไฟล์ใหม่ ---
+                        # ลบไฟล์เก่าและบันทึกไฟล์ใหม่
                         submission.files.all().delete() 
                         for f in uploaded_files:
                             SubmissionFile.objects.create(submission=submission, file=f)
@@ -253,50 +239,58 @@ def student_assignment_detail_view(request, pk):
                         form_valid = True
 
                 # -----------------------------------------------
-                # 🤖 AI AUTO GRADING (ทำงานเมื่อฟอร์มถูกต้อง)
+                # 🤖 AI AUTO GRADING
                 # -----------------------------------------------
                 if form_valid:
-                    print(f"--- 🚀 เริ่มต้นการตรวจ AI สำหรับ: {user.email} ---")
+                    # บันทึกสถานะ WAITING ลง DB ก่อนเรียก AI (กันเหนียว)
+                    submission.save()
+
+                    print(f"--- 🚀 AI Grading Started for: {user.email} ---")
                     try:
-                        # เรียกฟังก์ชันจาก ai_utils.py
+                        # เรียก AI
                         score, feedback = evaluate_submission_with_ai(submission)
 
-                        # บันทึกผล
+                        # อัปเดตผลลัพธ์
                         submission.ai_score = score
                         submission.ai_feedback = feedback
                         submission.is_graded = True
                         
-                        # Reset สถานะ Quiz (เพราะส่งงานใหม่ Quiz เก่าอาจไม่ตรงแล้ว)
+                        # Reset สถานะ Quiz (เพื่อให้สร้าง Quiz ใหม่ถ้าจำเป็น)
                         submission.quiz_generated = False 
+                        
+                        # (Optional) ถ้าคะแนน AI ดีมาก อาจจะให้ PASSED เลยก็ได้ แล้วแต่ Logic
+                        # if score >= 80: submission.status = 'PASSED'
+                        
                         submission.save()
 
-                        messages.success(request, f'ส่งงานเรียบร้อย! AI ตรวจแล้วได้คะแนน: {score}/{assignment.score}')
+                        # เช็คชื่อฟิลด์คะแนนเต็มดีๆ (score หรือ max_score)
+                        max_score = getattr(assignment, 'max_score', 100) 
+                        messages.success(request, f'ส่งงานเรียบร้อย! AI ตรวจเบื้องต้นได้: {score}/{max_score}')
                     
                     except Exception as e:
                         print(f"❌ AI Error: {e}")
-                        # บันทึกว่าส่งแล้ว แต่ AI มีปัญหา (จะได้ไม่ Error 500)
-                        submission.ai_feedback = f"ระบบรับงานแล้ว แต่ AI ขัดข้องชั่วคราว: {e}"
+                        # บันทึก Error Message ไว้ให้นักเรียน/ครูเห็น
+                        submission.ai_feedback = f"ระบบได้รับงานแล้ว (แต่ AI ประมวลผลขัดข้อง: {str(e)})"
                         submission.save()
-                        messages.warning(request, 'ส่งงานสำเร็จ (แต่ระบบตรวจอัตโนมัติขัดข้องในขณะนี้)')
+                        messages.warning(request, 'บันทึกการส่งงานสำเร็จ (ระบบตรวจอัตโนมัติขัดข้องชั่วคราว)')
 
                     return redirect('student:assignment_detail', pk=assignment.pk)
+                
                 else:
-                    messages.error(request, 'กรุณาตรวจสอบข้อมูลที่กรอก (Form Invalid)')
+                    messages.error(request, 'กรุณาตรวจสอบข้อมูลไฟล์หรือลิงก์ที่ส่ง')
 
         except Exception as e:
             print(f"System Error: {e}")
             messages.error(request, f'เกิดข้อผิดพลาดในระบบ: {e}')
 
     # =========================================================
-    # 👀 HANDLE GET REQUEST (เตรียมข้อมูลแสดงผล)
+    # 👀 HANDLE GET REQUEST
     # =========================================================
     
-    # 1. เตรียม Form (ถ้ามี submission เดิม ให้โหลดค่ามาใส่)
-    url_form = URLSubmissionForm(instance=submission) if submission and submission.submission_type and submission.submission_type.identifier == 'URL' else URLSubmissionForm()
+    # เตรียม Form
+    url_initial = submission if submission and submission.submission_type and submission.submission_type.identifier == 'URL' else None
+    url_form = URLSubmissionForm(instance=url_initial)
     file_form = FileSubmissionForm() 
-
-    # 2. เช็คว่า Assignment นี้อนุญาตให้ส่งแบบไหนบ้าง (เพื่อไปคุม Frontend)
-
 
     context = {
         'assignment': assignment,
@@ -306,7 +300,6 @@ def student_assignment_detail_view(request, pk):
         'file_form': file_form,
         'allow_url_submission': allow_url_submission,
         'allow_file_submission': allow_file_submission,
-        # ส่งตัวแปรควบคุมสิทธิ์ไปหน้า HTML
         'can_submit': can_submit,
         'disable_reason': disable_reason,
         'is_overdue': is_overdue,

@@ -47,9 +47,13 @@
 
                     <h6 class="text-success">📝 Quiz Result</h6>
                     {% if submission.quiz %}
-                    <p class="fw-bold">{{ submission.quiz.score }} / {{ submission.quiz.total_questions }}</p>
-                    <a href="{% url 'teacher:quiz_result' submission.pk %}" target="_blank"
-                        class="btn btn-sm btn-outline-success">ดูคำตอบ</a>
+                    <div class="d-flex align-items-center">
+                        <span class="fs-5 fw-bold me-3">{{ submission.quiz.score }} / {{ submission.quiz.total_questions }} คะแนน</span>
+                        <a href="{% url 'teacher:quiz_result' submission.pk %}" target="_blank"
+                            class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-list-ol me-1"></i> ดูคำตอบ
+                        </a>
+                    </div>
                     {% else %}
                     <p class="text-muted">ไม่มีข้อมูล Quiz</p>
                     {% endif %}
@@ -63,25 +67,42 @@
                     <h5 class="mb-0"><i class="fas fa-check-double me-2"></i>ตรวจงาน</h5>
                 </div>
                 <div class="card-body">
+                    
                     <form method="POST">
                         {% csrf_token %}
+                        
                         <div class="mb-3">
-                            <label class="form-label">คะแนน AI (แก้ไขได้):</label>
-                            <input type="number" name="ai_score" class="form-control" value="{{ submission.ai_score }}"
-                                required>
+                            <label class="form-label fw-bold">คะแนน AI (แก้ไขได้):</label>
+                            {{ form.score }} 
+                            </div>
+
+                        {% if submission.quiz %}
+                        <div class="mb-3 p-3 bg-success bg-opacity-10 rounded border border-success">
+                            <label class="form-label fw-bold text-success">
+                                <i class="fas fa-file-alt me-1"></i> คะแนน Quiz (แก้ไขได้):
+                            </label>
+                            {{ form.quiz_score }}
+                            <div class="form-text text-muted small">
+                                *แก้ไขคะแนน Quiz ได้ที่นี่ ระบบจะรวมคะแนนใหม่อัตโนมัติ
+                            </div>
                         </div>
+                        {% endif %}
+
                         <div class="mb-3">
-                            <label class="form-label">ความเห็นอาจารย์:</label>
-                            <textarea name="teacher_comment" class="form-control"
-                                rows="4">{{ submission.teacher_comment }}</textarea>
+                            <label class="form-label fw-bold">ความเห็นอาจารย์:</label>
+                            {{ form.feedback }}
                         </div>
+
                         <div class="d-grid gap-2">
-                            <button type="submit" name="action" value="approve" class="btn btn-success">อนุมัติ
-                                (Pass)</button>
-                            <button type="submit" name="action" value="reject" class="btn btn-warning">ส่งคืนให้แก้ไข
-                                (Request Changes)</button>
+                            <button type="submit" name="action" value="approve" class="btn btn-success">
+                                <i class="fas fa-check-circle me-2"></i>อนุมัติ (Pass)
+                            </button>
+                            <button type="submit" name="action" value="reject" class="btn btn-warning">
+                                <i class="fas fa-undo me-2"></i>ส่งคืนให้แก้ไข (Reject)
+                            </button>
                         </div>
                     </form>
+
                 </div>
             </div>
         </div>

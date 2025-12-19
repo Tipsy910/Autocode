@@ -8,7 +8,6 @@ urlpatterns = [
     path('assignment/<int:pk>/', teacher_assignment_detail, name='assignment_detail'),
     path('assignment/<int:pk>/delete/', AssignmentDeleteView.as_view(), name='assignment_delete'),
     path('assignment/<int:pk>/edit/', edit_assignment, name='assignment_edit'),
-    path('room/<int:room_pk>/announce/', create_announcement, name='create_announcement'),
     path('announcement/<int:pk>/edit/', edit_announcement, name='announcement_edit'),
     path('announcement/<int:pk>/delete/', AnnouncementDeleteView.as_view(), name='announcement_delete'),
     path('assignment/<int:pk>/submissions/', review_submission_view, name= 'review_submission'),

@@ -20,14 +20,33 @@
                 {{ assignment.score|floatformat:0 }} คะแนน
             </span>
 
-            <a href="{% url 'teacher:assignment_edit' pk=assignment.pk %}" class="btn btn-outline-primary">
-                <i class="fas fa-edit me-2"></i>แก้ไข
-            </a>
+            {# ================================================================= #}
+            {# 🔒 CHECK PERMISSION: เช็คว่าเป็นคนสร้าง หรือ เจ้าของห้องหรือไม่ #}
+            {# ================================================================= #}
+            {% if user == assignment.author or user == assignment.room.owner %}
+                
+                <a href="{% url 'teacher:assignment_edit' pk=assignment.pk %}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-2"></i>แก้ไข
+                </a>
 
-            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
-                data-bs-target="#deleteAssignmentModal">
-                <i class="fas fa-trash-alt me-2"></i>ลบ
-            </button>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                    data-bs-target="#deleteAssignmentModal">
+                    <i class="fas fa-trash-alt me-2"></i>ลบ
+                </button>
+
+            {% else %}
+
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#permissionDeniedModal">
+                    <i class="fas fa-lock me-2"></i>แก้ไข
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#permissionDeniedModal">
+                    <i class="fas fa-lock me-2"></i>ลบ
+                </button>
+
+            {% endif %}
+            {# ================================================================= #}
+
         </div>
     </div>
 
@@ -206,33 +225,20 @@
     </div>
 </div>
 
-<div class="modal fade" id="deleteAssignmentModal" tabindex="-1" aria-labelledby="deleteAssignmentModalLabel"
-    aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="permissionDeniedModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteAssignmentModalLabel">
-                    <i class="fas fa-exclamation-triangle me-2"></i>ยืนยันการลบงาน
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>คุณแน่ใจหรือไม่ว่าต้องการลบงานชิ้นนี้?</p>
-                <h5 class="fw-bold text-center my-3">"{{ assignment.title }}"</h5>
-                <div class="alert alert-warning border-danger text-danger mb-0">
-                    <i class="fas fa-exclamation-circle me-1"></i>
-                    <strong>คำเตือน:</strong> การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลการส่งงาน, คะแนน,
-                    และไฟล์ทั้งหมดของนักเรียนในงานนี้จะถูกลบไปด้วย
+            <div class="modal-body text-center p-4">
+                <div class="mb-3 text-secondary">
+                    <i class="fas fa-lock fa-3x"></i>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-
-                <form action="{% url 'teacher:assignment_delete' pk=assignment.pk %}" method="post">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">ยืนยันการลบ</button>
-                </form>
+                <h4 class="fw-bold mb-3">คุณไม่มีสิทธิ์ดำเนินการนี้</h4>
+                <p class="text-muted mb-4">
+                    คุณไม่สามารถแก้ไขหรือลบงานชิ้นนี้ได้ <br>
+                    เนื่องจากสงวนสิทธิ์เฉพาะ <strong>ผู้สร้างโจทย์ (Creator)</strong> <br>
+                    หรือ <strong>เจ้าของห้องเรียน (Room Owner)</strong> เท่านั้น
+                </p>
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">รับทราบ</button>
             </div>
         </div>
     </div>

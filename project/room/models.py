@@ -179,7 +179,7 @@ class SubmissionFile(models.Model):
     def __str__(self):
         return f"File for submission {self.submission.id} ({self.file.name})"
 
-# --- โมเดลสำหรับควิซที่ AI สร้างขึ้นมาโดยเฉพาะ ---
+
 class Announcement(models.Model):
     """
     โมเดลสำหรับเก็บประกาศ 1 ชิ้น
@@ -198,7 +198,7 @@ class Announcement(models.Model):
         ordering = ['-created_at'] # เรียงจากใหม่สุดไปเก่าสุดเสมอ
 
     def __str__(self):
-        return f"Announcement in {self.room.name} by {self.author.email}"
+        return f"Announcement in {self.room.name}"
 
 class AnnouncementFile(models.Model):
     """
