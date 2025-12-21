@@ -12,7 +12,92 @@ from django.contrib import messages
 from .ai_utils import *
 from django.db import transaction
 from datetime import timedelta
+import requests
+from urllib.parse import urlparse
+import json
+import ast 
 
+def check_colab_link_accessibility(url):
+    """
+    ฟังก์ชันช่วยเช็ค:
+    1. รูปแบบ URL ถูกต้อง
+    2. Domain คือ colab.research.google.com เป๊ะๆ
+    3. ลิงก์เปิดได้จริง (Public) ไม่ติด Login
+    """
+    # 1. เช็ค Domain แบบเข้มงวด
+    try:
+        parsed = urlparse(url)
+        # ตรวจว่าต้องเป็น https และ domain ต้องเป๊ะ
+        if parsed.scheme != "https" or parsed.netloc != "colab.research.google.com":
+            return False, "ลิงก์ต้องขึ้นต้นด้วย https://colab.research.google.com/ เท่านั้น"
+    except Exception:
+        return False, "รูปแบบ URL ไม่ถูกต้อง"
+
+    # 2. ยิง Request ไปเช็คว่าลิงก์เปิดได้ไหม (Ping)
+    try:
+        # ใส่ User-Agent เพื่อไม่ให้ Google บล็อกว่าเราเป็นบอท
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        
+        # timeout=5 คือถ้าเกิน 5 วิให้ตัดจบ (กันเว็บค้าง)
+        response = requests.get(url, headers=headers, timeout=5)
+
+        # ถ้า Google Redirect ไปหน้า Login (accounts.google.com) แสดงว่าไม่ได้เปิดแชร์
+        if "accounts.google.com" in response.url or "signin" in response.url:
+            return False, "ลิงก์นี้เป็นส่วนตัว (Private) กรุณาเปิดแชร์เป็น 'Anyone with the link' (ทุกคนที่มีลิงก์)"
+        
+        # ถ้า Response ไม่ใช่ 200 OK
+        if response.status_code != 200:
+            return False, f"ไม่สามารถเข้าถึงลิงก์ได้ (Status: {response.status_code})"
+            
+    except requests.exceptions.RequestException:
+        return False, "ไม่สามารถเชื่อมต่อกับลิงก์ได้ (ลิงก์อาจเสียหรือหมดอายุ)"
+
+    return True, ""
+
+def validate_file_content(uploaded_file):
+    """
+    ฟังก์ชันเปิดอ่านเนื้อหาไฟล์เพื่อเช็คว่าเป็น .py หรือ .ipynb ของจริงหรือไม่
+    """
+    filename = uploaded_file.name.lower()
+    
+    try:
+        # อ่านไฟล์ทั้งหมดขึ้นมาใน Memory เพื่อตรวจสอบ
+        content = uploaded_file.read()
+        
+        # ⚠️ สำคัญมาก: อ่านเสร็จต้องเลื่อน cursor กลับไปที่จุดเริ่มต้น (0) 
+        # ไม่งั้นตอน save ลง database ไฟล์จะกลายเป็นไฟล์เปล่า
+        uploaded_file.seek(0)
+        
+        # --- กรณีเป็น .ipynb (ต้องเป็น JSON และมีคีย์ 'cells') ---
+        if filename.endswith('.ipynb'):
+            try:
+                # ลองแปลง bytes เป็น string แล้วโหลด JSON
+                data = json.loads(content.decode('utf-8'))
+                
+                # เช็คโครงสร้างพื้นฐานของ Notebook
+                if 'cells' not in data or 'metadata' not in data:
+                    return False, "ไฟล์ .ipynb เสียหาย หรือโครงสร้างไม่ถูกต้อง"
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return False, "ไม่ใช่ไฟล์ Jupyter Notebook ที่ถูกต้อง (อาจเป็นไฟล์อื่นเปลี่ยนนามสกุลมา)"
+
+        # --- กรณีเป็น .py (ต้องเป็น Text ที่ Compile เป็น Python ได้) ---
+        elif filename.endswith('.py'):
+            try:
+                source_code = content.decode('utf-8')
+                # ลอง parse ดูว่าเป็น Python Syntax หรือไม่
+                ast.parse(source_code)
+            except UnicodeDecodeError:
+                return False, "ไฟล์นี้ไม่ใช่ Text File (อาจเป็น Binary/Image เปลี่ยนชื่อมา)"
+            except SyntaxError:
+                # ถ้า Parse ไม่ผ่าน แปลว่า Syntax ผิด แต่ก็ยังถือว่าเป็น Text File ได้ 
+                # แต่ถ้าจะเอาชัวร์ว่าส่งโค้ดรันได้ ให้ return False ตรงนี้ได้เลย
+                # ในที่นี้ขออนุญาตปล่อยผ่านกรณี Syntax Error (เผื่อเด็กเขียนโค้ดผิดแต่ส่งไฟล์ถูกประเภท)
+                pass 
+                
+    except Exception as e:
+        return False, f"เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}"
+
+    return True, ""
 
 class student_dashboard(LoginRequiredMixin, View):
     template_name = 'student/dashboard.html'
@@ -119,17 +204,20 @@ def student_room_detail_view(request, pk):
 @login_required
 def student_assignment_detail_view(request, pk):
     # 1. ดึงข้อมูล Assignment
-    assignment = get_object_or_404(Assignment, pk=pk)
+    try:
+        # พยายามหางาน
+        assignment = Assignment.objects.get(pk=pk)
+    except Assignment.DoesNotExist:
+        # ถ้าหาไม่เจอ (งานถูกลบ) ให้เด้งกลับ Dashboard
+        return render(request, 'student/assignment_not_found.html')
     user = request.user
     
     # 2. ตรวจสอบว่า User เป็นนักเรียนจริงหรือไม่
     try:
-        # เช็คชื่อ Model ดีๆ ว่าเป็น Student หรือ Students
         if not hasattr(user, 'student_profile'):
-             # สมมติว่า Model ชื่อ Student
-             raise Student.DoesNotExist 
+             raise Exception("User has no student profile") 
         student_profile = user.student_profile
-    except Exception: # ดัก Exception กว้างๆ ไว้ก่อนกรณีหา Model ไม่เจอ
+    except Exception:
         messages.error(request, 'บัญชีของคุณไม่ใช่บัญชีนักเรียน')
         return redirect('student:dashboard')
 
@@ -156,7 +244,7 @@ def student_assignment_detail_view(request, pk):
     # =========================================================
     now = timezone.now()
     is_overdue = now > assignment.due_date
-    has_done_quiz = True if quiz and quiz.is_completed else False # เช็คเพิ่มว่า is_completed ไหม
+    has_done_quiz = True if quiz and quiz.is_completed else False 
 
     can_submit = True
     disable_reason = ""
@@ -168,116 +256,148 @@ def student_assignment_detail_view(request, pk):
 
     # เงื่อนไขที่ 2: เลยกำหนดส่ง และ ไม่อนุญาตให้ส่งช้า (และไม่ใช่การแก้ตัว)
     elif is_overdue and not assignment.allow_late_submission:
-        # ข้อยกเว้น: ถ้าสถานะเป็น REJECT (ให้แก้) ต้องยอมให้ส่งใหม่ได้เสมอ แม้จะเลยเวลา
         if submission and submission.status == 'REJECT':
             can_submit = True 
         else:
             can_submit = False
             disable_reason = "หมดเวลาส่งงานแล้ว (ไม่อนุญาตให้ส่งล่าช้า)"
     
-    # เงื่อนไขที่ 3: (Optional) ถ้าทำ Quiz ไปแล้วอาจจะห้ามส่งใหม่
-    # if has_done_quiz: ...
-
     # =========================================================
     # 📤 HANDLE POST REQUEST (การส่งงาน)
     # =========================================================
     if request.method == 'POST':
-        # เช็คสิทธิ์ก่อนเริ่ม Process
         if not can_submit:
             messages.error(request, f"ไม่สามารถส่งงานได้: {disable_reason}")
             return redirect('student:assignment_detail', pk=pk)
 
         try:
             with transaction.atomic():
-                # สร้างหรือดึง Submission Object
+                # 1. ดึง Object มาก่อน (แต่ยังไม่ต้องแก้ค่า Status/Time)
                 submission, created = Submission.objects.get_or_create(
                     student=user, 
                     assignment=assignment
                 )
 
-                # อัปเดตเวลาส่ง
-                submission.submitted_at = timezone.now()
-                
-                # เช็ค Late Submission
-                if is_overdue:
-                    submission.is_late = True
-                
-                # ✅ รีเซ็ตสถานะเป็น "WAITING" เพื่อรอตรวจใหม่
-                submission.status = 'WAITING'
-                submission.is_graded = False  # Reset flag การตรวจ
-                
+                # ตัวแปรสำหรับเช็คว่าผ่านการตรวจสอบหรือยัง
                 form_valid = False
                 
                 # --- กรณี A: ส่งแบบ URL ---
                 if 'submit_url' in request.POST:
+                    # 🛡️ GUARD: เช็คว่ามีไฟล์ติดมาด้วยไหม?
+                    # ถ้า User เผลอแนบไฟล์ไว้ แล้วมากดส่ง URL เราควรเตือน เพราะเขาอาจกดปุ่มผิด
+                    if len(request.FILES) > 0:
+                        messages.warning(request, "⚠️ คุณมีการแนบไฟล์ค้างไว้! หากต้องการส่ง URL กรุณานำไฟล์ออกก่อน หรือหากต้องการส่งไฟล์ ให้กดปุ่ม 'ส่งงาน' ในแท็บไฟล์")
+                        return redirect('student:assignment_detail', pk=pk)
+                    
                     url_form = URLSubmissionForm(request.POST, instance=submission)
+                    
                     if url_form.is_valid():
+                        raw_link = url_form.cleaned_data.get('submitted_link').strip() # strip() ตัดช่องว่างหัวท้าย
+                        
+                        # ✅ เรียกฟังก์ชันตรวจสอบความปลอดภัยและการเข้าถึง
+                        is_valid_link, error_message = check_colab_link_accessibility(raw_link)
+
+                        if not is_valid_link:
+                            messages.error(request, f"❌ {error_message}")
+                            # หยุดการทำงาน ไม่บันทึก และ redirect กลับ
+                            return redirect('student:assignment_detail', pk=pk)
+
+                        # --- ถ้าผ่านทุกด่าน ก็บันทึกตามปกติ ---
+                        submission.submitted_at = timezone.now()
+                        submission.status = 'WAITING' 
+                        submission.is_late = is_overdue
+                        submission.is_graded = False
+                        
                         sub_instance = url_form.save(commit=False)
                         sub_instance.submission_type = SubmissionType.objects.get(identifier='URL')
                         sub_instance.save()
                         
-                        # ล้างไฟล์เก่าทิ้ง
                         sub_instance.files.all().delete()
                         form_valid = True
+                        messages.success(request, "ส่งลิงก์งานเรียบร้อยแล้ว")
+                    else:
+                        # 🔴 จุดแก้ไข: ดัก Error ของ URL ตรงนี้เลย (แก้ปัญหา System Error)
+                        print(f"❌ URL Form Error: {url_form.errors}")
+                        # แปลง Error เป็นข้อความ string เพื่อแสดง
+                        err_msg = ""
+                        for field, errors in url_form.errors.items():
+                            err_msg += f"{field}: {', '.join(errors)} "
+                        messages.error(request, f'ข้อมูลลิงก์ไม่ถูกต้อง: {err_msg}')
 
                 # --- กรณี B: ส่งแบบ File Upload ---
                 elif 'submit_file' in request.POST:
+                    
+                    submitted_link = request.POST.get('submitted_link', '').strip()
+                    if submitted_link:
+                         messages.warning(request, "⚠️ คุณมีการกรอก URL ค้างไว้! กรุณาลบ URL ออกก่อนส่งไฟล์ เพื่อป้องกันความสับสน")
+                         return redirect('student:assignment_detail', pk=pk)
+
                     file_form = FileSubmissionForm(request.POST, request.FILES)
+                    
                     if file_form.is_valid():
                         uploaded_files = request.FILES.getlist('files')
                         
-                        # Save Submission Type ก่อน
+                        # 🔍 CHECK 2: ตรวจสอบทั้งนามสกุล และ "ไส้ใน"
+                        for f in uploaded_files:
+                            # 2.1 เช็คนามสกุลก่อน (เร็ว)
+                            if not f.name.lower().endswith(('.py', '.ipynb')):
+                                messages.error(request, f"❌ ไฟล์ '{f.name}' นามสกุลไม่ถูกต้อง! (รับเฉพาะ .py, .ipynb)")
+                                return redirect('student:assignment_detail', pk=pk)
+                            
+                            # 2.2 เช็คเนื้อหาไฟล์ (Advanced)
+                            is_valid_content, err_msg = validate_file_content(f)
+                            if not is_valid_content:
+                                messages.error(request, f"❌ ไฟล์ '{f.name}' มีปัญหา: {err_msg}")
+                                return redirect('student:assignment_detail', pk=pk)
+
+                        # --- ถ้าผ่านทุกไฟล์ Save ได้เลย ---
+                        submission.submitted_at = timezone.now()
+                        submission.status = 'WAITING'
+                        submission.is_late = is_overdue
+                        submission.is_graded = False
+                        
                         submission.submission_type = SubmissionType.objects.get(identifier='FILE')
                         submission.submitted_link = None 
                         submission.save() 
 
-                        # ลบไฟล์เก่าและบันทึกไฟล์ใหม่
                         submission.files.all().delete() 
                         for f in uploaded_files:
                             SubmissionFile.objects.create(submission=submission, file=f)
                         
                         form_valid = True
+                        messages.success(request, "ส่งไฟล์งานเรียบร้อยแล้ว") # เพิ่มแจ้งเตือนความสำเร็จ
+                    
+                    else:
+                        print(f"❌ File Form Error: {file_form.errors}")
+                        messages.error(request, 'ไฟล์ที่อัปโหลดไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง')
 
                 # -----------------------------------------------
-                # 🤖 AI AUTO GRADING
+                # 🤖 AI AUTO GRADING (ทำงานเมื่อ form_valid = True เท่านั้น)
                 # -----------------------------------------------
                 if form_valid:
-                    # บันทึกสถานะ WAITING ลง DB ก่อนเรียก AI (กันเหนียว)
                     submission.save()
-
                     print(f"--- 🚀 AI Grading Started for: {user.email} ---")
                     try:
-                        # เรียก AI
                         score, feedback = evaluate_submission_with_ai(submission)
-
-                        # อัปเดตผลลัพธ์
+                        
                         submission.ai_score = score
                         submission.ai_feedback = feedback
                         submission.is_graded = True
-                        
-                        # Reset สถานะ Quiz (เพื่อให้สร้าง Quiz ใหม่ถ้าจำเป็น)
                         submission.quiz_generated = False 
-                        
-                        # (Optional) ถ้าคะแนน AI ดีมาก อาจจะให้ PASSED เลยก็ได้ แล้วแต่ Logic
-                        # if score >= 80: submission.status = 'PASSED'
-                        
                         submission.save()
 
-                        # เช็คชื่อฟิลด์คะแนนเต็มดีๆ (score หรือ max_score)
                         max_score = getattr(assignment, 'max_score', 100) 
-                        messages.success(request, f'ส่งงานเรียบร้อย! AI ตรวจเบื้องต้นได้: {score}/{max_score}')
+                        messages.success(request, f'ส่งงานเรียบร้อย! AI ตรวจได้: {score}/{max_score}')
                     
                     except Exception as e:
                         print(f"❌ AI Error: {e}")
-                        # บันทึก Error Message ไว้ให้นักเรียน/ครูเห็น
-                        submission.ai_feedback = f"ระบบได้รับงานแล้ว (แต่ AI ประมวลผลขัดข้อง: {str(e)})"
+                        submission.ai_feedback = f"ระบบได้รับงานแล้ว (AI ขัดข้อง: {str(e)})"
                         submission.save()
-                        messages.warning(request, 'บันทึกการส่งงานสำเร็จ (ระบบตรวจอัตโนมัติขัดข้องชั่วคราว)')
+                        messages.warning(request, 'ส่งงานสำเร็จ (ระบบตรวจอัตโนมัติขัดข้องชั่วคราว)')
 
                     return redirect('student:assignment_detail', pk=assignment.pk)
                 
-                else:
-                    messages.error(request, 'กรุณาตรวจสอบข้อมูลไฟล์หรือลิงก์ที่ส่ง')
+                # ลบ else: สุดท้ายออก เพราะย้ายไปจัดการในแต่ละ if/elif แล้ว
 
         except Exception as e:
             print(f"System Error: {e}")
@@ -286,8 +406,6 @@ def student_assignment_detail_view(request, pk):
     # =========================================================
     # 👀 HANDLE GET REQUEST
     # =========================================================
-    
-    # เตรียม Form
     url_initial = submission if submission and submission.submission_type and submission.submission_type.identifier == 'URL' else None
     url_form = URLSubmissionForm(instance=url_initial)
     file_form = FileSubmissionForm() 

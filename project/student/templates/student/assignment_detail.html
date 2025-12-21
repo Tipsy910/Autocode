@@ -6,7 +6,17 @@
 
 {% block content %}
 <div class="container mt-4 mb-5">
-    
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                    <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
     <div class="row g-5">
         <div class="col-md-8">
             <h1 class="display-6 border-bottom pb-3 mb-4">
@@ -193,13 +203,15 @@
                         <div class="tab-content">
                             {% if allow_file_submission %}
                             <div class="tab-pane fade show active" id="file-pane" role="tabpanel">
-                                <form method="POST" action="" enctype="multipart/form-data" id="file-submission-form" onsubmit="showLoading()">
+                                <form method="POST" action="" enctype="multipart/form-data" id="file-submission-form" onsubmit="showLoading(this)">
                                     {% csrf_token %}
+                                    <input type="hidden" name="submit_file" value="true">
+                                    
                                     <div class="mb-3">
                                         <label for="{{ file_form.files.id_for_label }}" class="btn btn-outline-secondary w-100 text-start py-2">
                                             <i class="fas fa-folder-open me-2"></i> เลือกไฟล์...
                                         </label>
-                                        <input type="file" name="{{ file_form.files.name }}" id="{{ file_form.files.id_for_label }}" class="d-none" multiple>
+                                        <input type="file" name="{{ file_form.files.name }}" id="{{ file_form.files.id_for_label }}" class="d-none" multiple accept=".py,.ipynb">
                                     </div>
 
                                     <div id="file-list-preview" class="mb-3" style="display: none;">
@@ -216,8 +228,10 @@
 
                             {% if allow_url_submission %}
                             <div class="tab-pane fade {% if not allow_file_submission %}show active{% endif %}" id="url-pane" role="tabpanel">
-                                <form method="POST" action="" onsubmit="showLoading()">
+                                <form method="POST" action="" onsubmit="showLoading(this)">
                                     {% csrf_token %}
+                                    <input type="hidden" name="submit_url" value="true">
+                                    
                                     <div class="mb-3">
                                         <label class="form-label small text-muted">Google Colab Link</label>
                                         {{ url_form.submitted_link }}
@@ -225,6 +239,7 @@
                                             <div class="text-danger small mt-1">{{ url_form.submitted_link.errors }}</div>
                                         {% endif %}
                                     </div>
+                                    
                                     <button type="submit" name="submit_url" class="btn btn-primary w-100 btn-submit-action">
                                         <span class="normal-text"><i class="fas fa-paper-plane me-2"></i>ส่งลิงก์</span>
                                         <span class="loading-text d-none"><span class="spinner-border spinner-border-sm me-2"></span>กำลังส่ง...</span>
@@ -311,7 +326,7 @@
                                         </div>
 
                                     {% else %} 
-                                        {# WAITING Status (ที่เพิ่งแก้ backend ไป) #}
+                                        {# WAITING Status #}
                                         <div class="text-muted py-2">
                                             <div class="mb-3">
                                                 <i class="fas fa-clock fa-3x text-warning"></i>
@@ -326,7 +341,7 @@
                                 {% endif %}
 
                             {% else %}
-                                {# ส่งงานแล้ว แต่ยังไม่มี AI Feedback (กำลังประมวลผล) #}
+                                {# ส่งงานแล้ว แต่ยังไม่มี AI Feedback #}
                                 <div class="py-4">
                                     <div class="spinner-border text-primary mb-2" role="status"></div>
                                     <p class="small text-muted">กำลังให้ AI ตรวจงาน...</p>
@@ -359,12 +374,10 @@
 
 <script>
     function showLoading(formElement) {
-        // หาปุ่ม submit ในฟอร์มที่กด
         let btn;
         if (formElement) {
             btn = formElement.querySelector('button[type="submit"]');
         } else {
-            // กรณีทั่วไป (เผื่อไว้)
             btn = document.querySelector('.btn-submit-action:hover') || document.querySelector('.btn-submit-action'); 
         }
 
@@ -378,17 +391,43 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Tab switching
+        // --- 1. Tab Switching & Auto Clear Logic (อัปเกรด) ---
+        // เมื่อเปลี่ยน Tab ให้ล้างค่าในอีก Tab ทิ้ง เพื่อป้องกัน User สับสน
+        
         var triggerTabList = [].slice.call(document.querySelectorAll('#submitTab button'))
         triggerTabList.forEach(function (triggerEl) {
             var tabTrigger = new bootstrap.Tab(triggerEl)
+            
             triggerEl.addEventListener('click', function (event) {
                 event.preventDefault()
                 tabTrigger.show()
             })
+
+            // Event เมื่อ Tab ถูกเปลี่ยนเสร็จสิ้น
+            triggerEl.addEventListener('shown.bs.tab', function (event) {
+                const activeTabId = event.target.id; // Tab ที่เพิ่งกด (file-tab หรือ url-tab)
+
+                if (activeTabId === 'url-tab') {
+                    // ถ้ามา Tab URL -> ให้ล้างค่า File ทิ้ง
+                    const fileInput = document.getElementById('{{ file_form.files.id_for_label }}');
+                    const fileListPreview = document.getElementById('selected-files-list');
+                    const previewContainer = document.getElementById('file-list-preview');
+                    
+                    if (fileInput) fileInput.value = ''; // ล้าง Input File
+                    if (fileListPreview) fileListPreview.innerHTML = ''; // ล้าง list
+                    if (previewContainer) previewContainer.style.display = 'none'; // ซ่อน preview
+                    // console.log('Switched to URL: Files cleared');
+                } 
+                else if (activeTabId === 'file-tab') {
+                    // ถ้ามา Tab File -> ให้ล้างค่า URL ทิ้ง
+                    const urlInput = document.querySelector('input[name="submitted_link"]');
+                    if (urlInput) urlInput.value = ''; // ล้าง Input URL
+                    // console.log('Switched to File: URL cleared');
+                }
+            })
         });
 
-        // File Preview
+        // --- 2. File Preview Logic (เหมือนเดิม) ---
         const fileInput = document.getElementById('{{ file_form.files.id_for_label }}'); 
         const previewContainer = document.getElementById('file-list-preview');
         const fileListElement = document.getElementById('selected-files-list');

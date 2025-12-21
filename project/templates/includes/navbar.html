@@ -30,7 +30,7 @@
                                 {% for noti in navbar_notifications %}
                                     <li>
                                         <a class="dropdown-item p-3 border-bottom d-flex align-items-start {% if not noti.is_read %}bg-light{% endif %}" 
-                                           href="{{ noti.link }}" 
+                                           href="{% url 'notifications:mark_as_read' noti.id %}" 
                                            style="white-space: normal;">
                                             
                                             <div class="me-3 mt-1">
@@ -52,12 +52,23 @@
                                     </li>
                                 {% endfor %}
                                 
-                                <li><a class="dropdown-item text-center small text-primary py-2" href="#">ดูทั้งหมด</a></li>
+                                <li>
+                                    <a class="dropdown-item text-center small text-primary py-2 fw-bold" 
+                                       href="{% url 'notifications:notification_history' %}">
+                                       ดูทั้งหมด (View All)
+                                    </a>
+                                </li>
 
                             {% else %}
                                 <li class="p-4 text-center text-muted">
                                     <i class="far fa-bell-slash fa-2x mb-2 text-secondary opacity-50"></i>
                                     <p class="small mb-0">ไม่มีการแจ้งเตือน</p>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item text-center small text-primary py-2 fw-bold" 
+                                       href="{% url 'notifications:notification_history' %}">
+                                       ดูประวัติการแจ้งเตือน
+                                    </a>
                                 </li>
                             {% endif %}
                         </ul>

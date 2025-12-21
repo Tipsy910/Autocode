@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}การแจ้งเตือนทั้งหมด - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <h2 class="h4 mb-0 text-nowrap">
+                    <i class="fas fa-bell text-primary me-2"></i>การแจ้งเตือน
+                </h2>
+                
+                <div class="d-flex gap-2 align-items-center">
+                    <form method="GET" action="" id="filterForm">
+                        <select name="room" class="form-select form-select-sm" onchange="document.getElementById('filterForm').submit()" style="max-width: 200px; min-width: 150px;">
+                            <option value="" {% if not selected_room_id %}selected{% endif %}>ทุกห้องเรียน</option>
+                            {% for room in student_rooms %}
+                                <option value="{{ room.id }}" {% if selected_room_id == room.id %}selected{% endif %}>
+                                    {{ room.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+
+                    <form method="POST" action="">
+                        {% csrf_token %}
+                        <button type="submit" name="mark_all_read" class="btn btn-outline-secondary btn-sm text-nowrap">
+                            <i class="fas fa-check-double me-1"></i> <span class="d-none d-sm-inline">อ่านครบ</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="list-group shadow-sm">
+                {% for notif in notifications %}
+                    <a href="{{ notif.link|default:'#' }}" class="list-group-item list-group-item-action p-3 {% if not notif.is_read %}bg-light-blue{% endif %} border-start-0 border-end-0 border-top-0 border-bottom">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            
+                            <div class="d-flex align-items-start">
+                                <div class="me-3 mt-1">
+                                    {% if 'งานใหม่' in notif.message or 'New Assignment' in notif.message %}
+                                        <div class="icon-circle bg-primary text-white">
+                                            <i class="fas fa-book"></i>
+                                        </div>
+                                    {% elif 'ผ่านแล้ว' in notif.message or 'PASSED' in notif.message %}
+                                        <div class="icon-circle bg-success text-white">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                    {% elif 'แก้ไข' in notif.message or 'REJECT' in notif.message %}
+                                        <div class="icon-circle bg-danger text-white">
+                                            <i class="fas fa-exclamation"></i>
+                                        </div>
+                                    {% elif 'ประกาศ' in notif.message or 'Announcement' in notif.message %}
+                                         <div class="icon-circle bg-warning text-white">
+                                            <i class="fas fa-bullhorn"></i>
+                                        </div>
+                                    {% else %}
+                                        <div class="icon-circle bg-secondary text-white">
+                                            <i class="fas fa-info"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div>
+                                    <h6 class="mb-1 text-dark fw-bold">
+                                        {{ notif.message }}
+                                    </h6>
+                                    <small class="text-muted">
+                                        {{ notif.created_at|timesince }} ที่แล้ว
+                                        {% if notif.room %}
+                                            <span class="badge bg-light text-secondary border ms-1">{{ notif.room.name }}</span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+
+                            {% if not notif.is_read %}
+                                <span class="badge bg-primary rounded-circle p-1 ms-2" style="width: 10px; height: 10px;">
+                                    <span class="visually-hidden">New</span>
+                                </span>
+                            {% endif %}
+                        </div>
+                    </a>
+                {% empty %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="far fa-bell-slash fa-3x mb-3 text-secondary opacity-50"></i>
+                        <p>ไม่มีการแจ้งเตือน{% if selected_room_id %}สำหรับห้องนี้{% endif %}</p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if notifications.has_other_pages %}
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if notifications.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ notifications.previous_page_number }}{% if selected_room_id %}&room={{ selected_room_id }}{% endif %}">ก่อนหน้า</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">ก่อนหน้า</span></li>
+                        {% endif %}
+
+                        {% for i in notifications.paginator.page_range %}
+                            {% if notifications.number == i %}
+                                <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                            {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ i }}{% if selected_room_id %}&room={{ selected_room_id }}{% endif %}">{{ i }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if notifications.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ notifications.next_page_number }}{% if selected_room_id %}&room={{ selected_room_id }}{% endif %}">ถัดไป</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">ถัดไป</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-light-blue {
+        background-color: #f0f8ff; 
+    }
+    .icon-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0; /* ป้องกันวงกลมเบี้ยวเวลาจอเล็ก */
+    }
+    .list-group-item {
+        transition: background-color 0.2s;
+    }
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}

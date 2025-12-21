@@ -8,7 +8,7 @@ from django.utils.html import strip_tags
 from django.conf import settings
 from notifications.models import Notification
 
-# ✅ แก้ไขตรงนี้: เปลี่ยน 'classroom' เป็น 'room' ตามชื่อแอปของคุณ
+# ✅ 1. แจ้งเตือนเมื่ออาจารย์สั่งงานใหม่ (Assignment)
 @receiver(post_save, sender='room.Assignment') 
 def create_assignment_notification(sender, instance, created, **kwargs):
     """
@@ -26,15 +26,19 @@ def create_assignment_notification(sender, instance, created, **kwargs):
         # --- ส่วนที่ 1: สร้าง Notification ในเว็บ ---
         notification_list = []
         for student_profile in students:
-            noti = Notification(
-                recipient=student_profile.user,
-                message=f"📚 งานใหม่: {assignment.title} ({room.name})",
-                link=f"/student/assignment/{assignment.id}/"
-            )
-            notification_list.append(noti)
+            # ตรวจสอบว่า user มีอยู่จริง
+            if student_profile.user:
+                noti = Notification(
+                    recipient=student_profile.user,
+                    message=f"📚 งานใหม่: {assignment.title} ({room.name})",
+                    link=f"/student/assignment/{assignment.id}/",
+                    room=room  # ✅ ใส่ข้อมูล Room
+                )
+                notification_list.append(noti)
         
-        Notification.objects.bulk_create(notification_list)
-        print(f"🔔 Created in-app notifications for {len(notification_list)} students.")
+        if notification_list:
+            Notification.objects.bulk_create(notification_list)
+            print(f"🔔 Created in-app notifications for {len(notification_list)} students.")
 
         # --- ส่วนที่ 2: ส่งอีเมล ---
         subject = f"📚 งานใหม่: {assignment.title} - วิชา {room.name}"
@@ -43,7 +47,7 @@ def create_assignment_notification(sender, instance, created, **kwargs):
         for student_profile in students:
             try:
                 user = student_profile.user
-                if user.email:
+                if user and user.email:
                     context = {
                         'student_name': user.first_name or user.username,
                         'room_name': room.name,
@@ -68,51 +72,151 @@ def create_assignment_notification(sender, instance, created, **kwargs):
                 print(f"❌ Failed to send email: {e}")
 
 
+# ✅ 2. แจ้งเตือนเมื่อสถานะการส่งงานเปลี่ยน (Submission Status)
 @receiver(post_save, sender='room.Submission') 
 def notify_submission_status_change(sender, instance, created, **kwargs):
     """
-    ทำงานเมื่อสถานะการส่งงานเปลี่ยนแปลง (เช่น อาจารย์ส่งคืน หรือ ให้ผ่าน)
+    ทำงานเมื่อสถานะการส่งงานเปลี่ยนแปลง (PASSED หรือ REJECT)
+    จะทำการ 1. แจ้งเตือนในเว็บ และ 2. ส่งอีเมลหานักเรียน
     """
-    # ถ้าเป็นการสร้างครั้งแรก (นักเรียนเพิ่งกดส่ง) เราอาจจะไม่ต้องแจ้งเตือนตัวเอง
-    # หรือถ้าต้องการแจ้งว่า "ส่งสำเร็จ" ก็เอา if created ออกได้
     if created:
         return
 
     submission = instance
-    student_user = submission.student # สมมติว่าเป็น FK ไปหา User
+    student_user = submission.student
     assignment = submission.assignment
+    room = assignment.room # ✅ ดึง Room เตรียมไว้
     
-    # เช็คสถานะเพื่อสร้างข้อความที่เหมาะสม
-    message = ""
-    verb = ""
-    
-    if submission.status == 'REJECT':
-        message = f"⚠️ งานถูกส่งคืน: {assignment.title} (กรุณาแก้ไข)"
-        verb = "ส่งคืนงาน"
-    elif submission.status == 'PASSED':
-        message = f"✅ งานผ่านแล้ว: {assignment.title}"
-        verb = "ตรวจแล้ว"
-    else:
-        # ถ้าเป็นสถานะอื่น (เช่น Pending) อาจไม่ต้องแจ้งเตือน
-        return
+    # ดึง Base URL เพื่อสร้างลิงก์เต็มในอีเมล
+    base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
+    relative_link = f"/student/assignment/{assignment.id}/"
+    full_url = f"{base_url}{relative_link}"
 
-    # --- ส่วนที่ 1: สร้าง Notification ในเว็บ ---
-    # ลิงก์ไปยังหน้ารายละเอียดงานของนักเรียน
-    link = f"/student/assignment/{assignment.id}/"
+    # เตรียมตัวแปรสำหรับ Logic
+    message = ""
+    should_notify = False
     
-    # ป้องกันการแจ้งเตือนซ้ำ (Optional): เช็คว่ามีการแจ้งเตือนล่าสุดเรื่องเดิมไปหรือยัง
-    # ถ้าไม่ซีเรียสเรื่องแจ้งเตือนซ้ำตอนกด Save หลายรอบ ก็ลบ 3 บรรทัดนี้ได้
-    recent_noti = Notification.objects.filter(
-        recipient=student_user,
-        link=link,
-        is_read=False
-    ).last()
-    
-    # ถ้ายังไม่มีแจ้งเตือน หรือข้อความเปลี่ยนไป ให้สร้างใหม่
-    if not recent_noti or recent_noti.message != message:
-        Notification.objects.create(
+    # =========================================================
+    # CASE 1: งานผ่าน (PASSED)
+    # =========================================================
+    if submission.status == 'PASSED':
+        message = f"✅ งานผ่านแล้ว: {assignment.title}"
+        should_notify = True
+        
+        # --- ส่งอีเมล (Approve) ---
+        try:
+            subject = f"✅ ยินดีด้วย! งาน '{assignment.title}' ผ่านการตรวจสอบแล้ว"
+            context = {
+                'student_name': student_user.get_full_name() or student_user.username,
+                'assignment_title': assignment.title,
+                'ai_score': submission.ai_score,
+                'teacher_comment': submission.teacher_comment,
+                'action_url': full_url,
+            }
+            html_message = render_to_string('notifications/emails/approve_submission.html', context)
+            plain_message = strip_tags(html_message)
+            
+            send_mail(
+                subject, 
+                plain_message, 
+                settings.DEFAULT_FROM_EMAIL, 
+                [student_user.email], 
+                html_message=html_message, 
+                fail_silently=True
+            )
+            print(f"📧 Sent Approve Email to {student_user.email}")
+        except Exception as e:
+            print(f"❌ Failed to send Approve Email: {e}")
+
+    # =========================================================
+    # CASE 2: ส่งคืน (REJECT)
+    # =========================================================
+    elif submission.status == 'REJECT':
+        message = f"⚠️ งานถูกส่งคืน: {assignment.title} (กรุณาแก้ไข)"
+        should_notify = True
+
+        # --- ส่งอีเมล (Reject) ---
+        try:
+            subject = f"⚠️ แจ้งแก้ไขงาน: {assignment.title}"
+            context = {
+                'student_name': student_user.get_full_name() or student_user.username,
+                'assignment_title': assignment.title,
+                'teacher_comment': submission.teacher_comment,
+                'action_url': full_url,
+            }
+            html_message = render_to_string('notifications/emails/reject_submission.html', context)
+            plain_message = strip_tags(html_message)
+            
+            send_mail(
+                subject, 
+                plain_message, 
+                settings.DEFAULT_FROM_EMAIL, 
+                [student_user.email], 
+                html_message=html_message, 
+                fail_silently=True
+            )
+            print(f"📧 Sent Reject Email to {student_user.email}")
+        except Exception as e:
+            print(f"❌ Failed to send Reject Email: {e}")
+
+    # =========================================================
+    # 🔔 ส่วนสร้าง Web Notification (ใช้ร่วมกัน)
+    # =========================================================
+    if should_notify:
+        # เช็คกันซ้ำ (Notification De-duplication)
+        recent_noti = Notification.objects.filter(
             recipient=student_user,
-            message=message,
-            link=link
-        )
-        print(f"🔔 Notified student {student_user.email} about status: {submission.status}")
+            link=relative_link,
+            is_read=False
+        ).last()
+        
+        # ถ้าไม่มีแจ้งเตือนล่าสุด หรือข้อความเปลี่ยนไป ให้สร้างใหม่
+        if not recent_noti or recent_noti.message != message:
+            Notification.objects.create(
+                recipient=student_user,
+                message=message,
+                link=relative_link,
+                room=room  # ✅ ใส่ข้อมูล Room (สำคัญสำหรับการกรอง)
+            )
+            print(f"🔔 Web Notification Created: {message}")
+
+
+# ✅ 3. แจ้งเตือนเมื่อมีประกาศใหม่ (Announcement)
+@receiver(post_save, sender='room.Announcement') 
+def notify_new_announcement(sender, instance, created, **kwargs):
+    """
+    ทำงานเมื่อมีการโพสต์ประกาศใหม่ในห้องเรียน
+    ✅ แจ้งเตือนเฉพาะในแอป (ไม่ส่งเมล)
+    """
+    if created:
+        post = instance
+        room = post.room       
+        author = post.author   
+        
+        # ดึงรายชื่อนักเรียนทั้งหมดในห้อง
+        students = room.students.all()
+        
+        # ลิงก์ไปยังหน้าห้องเรียน
+        relative_link = f"/student/room/{room.id}/"
+
+        notification_list = []
+        
+        for student_profile in students:
+            # เช็คความปลอดภัย: ต้องมี user และ ต้องไม่ใช่คนโพสต์เอง
+            if student_profile.user and student_profile.user != author:
+                
+                # ตัดข้อความให้สั้นลงถ้าประกาศยาวเกินไป
+                short_content = post.content[:30] + "..." if len(post.content) > 30 else post.content
+                
+                noti = Notification(
+                    recipient=student_profile.user,
+                    message=f"📢 ประกาศใหม่จาก {author.first_name}: {short_content}",
+                    link=relative_link,
+                    room=room, # ✅ ใส่ข้อมูล Room
+                    is_read=False
+                )
+                notification_list.append(noti)
+        
+        if notification_list:
+            Notification.objects.bulk_create(notification_list)
+            print(f"🔔 Created {len(notification_list)} notifications for new announcement in {room.name}")

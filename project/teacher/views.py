@@ -16,8 +16,7 @@ from django.core.mail import send_mail
 from django.core.exceptions import ObjectDoesNotExist # 📌 อย่าลืม import ตัวนี้ไว้บนสุด
 # Create your views here.
 
-
-class teacher_dashboard(View):
+class teacher_dashboard(LoginRequiredMixin,View):
     template_name = 'teacher/dashboard.html'
 
     def get_teacher_profile(self, user):
@@ -525,22 +524,17 @@ def review_submission_view(request, pk):
         return redirect('teacher:dashboard')
 
     # ✅ STEP 1: ดึง Quiz แบบปลอดภัย (Safe Fetch)
-    # เราจะไม่เรียก submission.quiz ตรงๆ เพราะถ้าไม่มีมันจะ Error ทันที
     quiz_instance = None
     current_quiz_score = 0
     
     try:
-        # ลองดึง quiz ถ้ามี
         if hasattr(submission, 'quiz'): 
             quiz_instance = submission.quiz
             current_quiz_score = quiz_instance.score
-    except ObjectDoesNotExist:
-        # ถ้าหาไม่เจอก็ให้เป็น None ไป โปรแกรมจะไม่พัง
-        quiz_instance = None
-        current_quiz_score = 0
-    except Exception as e:
+    except (ObjectDoesNotExist, Exception) as e:
         print(f"Quiz access error: {e}")
         quiz_instance = None
+        current_quiz_score = 0
 
     # 3. Logic การตรวจงาน (POST)
     if request.method == 'POST':
@@ -577,43 +571,20 @@ def review_submission_view(request, pk):
             if action == 'approve':
                 submission.status = 'PASSED'
                 
-                # --- ✅ STEP 3: ลบ Quiz เก่าทิ้งเพื่อให้สร้างใหม่ (Safe Delete) ---
+                # --- ลบ Quiz เก่าทิ้งเพื่อให้สร้างใหม่ (Safe Delete) ---
                 if quiz_instance:
                     try:
-                        quiz_instance.delete() # ลบจาก Database
-                        quiz_instance = None   # เคลียร์ตัวแปร local
+                        quiz_instance.delete()
+                        quiz_instance = None
                         current_quiz_score = 0 
                     except Exception as e:
                         print(f"Error deleting quiz: {e}")
 
-                # สำคัญ: รีเซ็ต flag เพื่อให้ปุ่ม 'เริ่มทำแบบทดสอบ' โผล่ที่ฝั่งนักเรียน
+                # รีเซ็ต flag เพื่อให้ปุ่ม 'เริ่มทำแบบทดสอบ' โผล่ที่ฝั่งนักเรียน
                 submission.quiz_generated = False 
-                submission.save() 
-
-                # --- ส่งอีเมลแจ้งข่าวดี ---
-                student_email = submission.student.email
-                assignment_url = request.build_absolute_uri(
-                    reverse('student:assignment_detail', args=[submission.assignment.id])
-                )
-
-                context = {
-                    'student_name': submission.student.get_full_name(),
-                    'assignment_title': submission.assignment.title,
-                    'ai_score': submission.ai_score,
-                    'teacher_comment': new_comment,
-                    'action_url': assignment_url,
-                }
                 
-                # (Render Email Template Code...)
-                html_message = render_to_string('teacher/emails/approve_submission.html', context)
-                plain_message = strip_tags(html_message)
-                subject = f"✅ ยินดีด้วย! งาน '{submission.assignment.title}' ผ่านการตรวจสอบแล้ว"
-
-                try:
-                    send_mail(subject, plain_message, settings.DEFAULT_FROM_EMAIL, [student_email], html_message=html_message, fail_silently=True)
-                    messages.success(request, f"อนุมัติงานเรียบร้อย (นักเรียนสามารถเริ่มทำแบบทดสอบได้)")
-                except:
-                    messages.warning(request, "บันทึกสถานะแล้ว แต่ส่งอีเมลไม่สำเร็จ")
+                submission.save() # 🔔 Signal จะทำงานที่นี่ (แจ้งเตือน + ส่งเมล)
+                messages.success(request, "อนุมัติงานเรียบร้อย (ระบบกำลังแจ้งเตือนนักเรียน)")
 
             # ========================================================
             # ❌ CASE 2: ส่งคืน (REJECT) -> สถานะ REJECT
@@ -622,7 +593,7 @@ def review_submission_view(request, pk):
                 submission.status = 'REJECT'
                 submission.is_graded = False 
                 
-                # --- ล้าง Quiz ทิ้ง (ถ้ามี) ---
+                # --- ลบ Quiz ทิ้ง (ถ้ามี) ---
                 submission.quiz_generated = False
                 if quiz_instance:
                     try:
@@ -630,27 +601,13 @@ def review_submission_view(request, pk):
                     except:
                         pass
                 
-                submission.save()
+                submission.save() # 🔔 Signal จะทำงานที่นี่ (แจ้งเตือน + ส่งเมล)
+                messages.warning(request, "ส่งคืนงานเรียบร้อย (ระบบกำลังแจ้งเตือนนักเรียน)")
 
-                # --- ส่งอีเมลแจ้งงานแก้ ---
-                # (Email Code same as before...)
-                context = {
-                    'student_name': submission.student.get_full_name(),
-                    'assignment_title': submission.assignment.title,
-                    'teacher_comment': new_comment,
-                    'action_url': request.build_absolute_uri(reverse('student:assignment_detail', args=[submission.assignment.id])),
-                }
-                html_message = render_to_string('teacher/emails/reject_submission.html', context)
-                plain_message = strip_tags(html_message)
-                
-                try:
-                    send_mail(f"⚠️ งานถูกส่งคืนให้แก้ไข: {submission.assignment.title}", plain_message, settings.DEFAULT_FROM_EMAIL, [submission.student.email], html_message=html_message, fail_silently=True)
-                    messages.warning(request, "ส่งคืนงานเรียบร้อยแล้ว")
-                except:
-                    pass
-
-            # กรณี Save ธรรมดา (ไม่ใช่ Approve/Reject)
-            if action not in ['approve', 'reject']:
+            # ========================================================
+            # 💾 CASE 3: บันทึกเฉยๆ (Save Draft)
+            # ========================================================
+            else:
                 submission.save()
                 messages.success(request, "บันทึกข้อมูลเรียบร้อย")
             
@@ -660,7 +617,7 @@ def review_submission_view(request, pk):
     else:
         initial_data = {
             'score': submission.ai_score,
-            'quiz_score': current_quiz_score, # ใช้ค่าที่ Safe Fetch มา
+            'quiz_score': current_quiz_score,
             'feedback': submission.teacher_comment
         }
         form = GradingForm(initial=initial_data)
@@ -668,7 +625,7 @@ def review_submission_view(request, pk):
     return render(request, 'teacher/review_submission.html', {
         'submission': submission,
         'form': form,
-        'quiz': quiz_instance # ส่งตัวแปรที่ Safe แล้วไปหน้าเว็บ
+        'quiz': quiz_instance
     })
 
 @login_required

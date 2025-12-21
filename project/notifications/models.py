@@ -9,6 +9,8 @@ class Notification(models.Model):
     link = models.CharField(max_length=255, blank=True, null=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    # on_delete=models.SET_NULL คือถ้าห้องถูกลบ ประวัติแจ้งเตือนยังอยู่ แต่ฟิลด์ห้องจะว่างเปล่า
+    room = models.ForeignKey('room.Room', on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications')
 
     class Meta:
         ordering = ['-created_at']
