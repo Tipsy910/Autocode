@@ -21,7 +21,7 @@
             </span>
 
             {# ================================================================= #}
-            {# 🔒 CHECK PERMISSION: เช็คว่าเป็นคนสร้าง หรือ เจ้าของห้องหรือไม่ #}
+            {# 🔒 CHECK PERMISSION #}
             {# ================================================================= #}
             {% if user == assignment.author or user == assignment.room.owner %}
                 
@@ -73,7 +73,7 @@
             <div class="card bg-warning bg-opacity-10 border-0 shadow-sm">
                 <div class="card-body text-center">
                     <h3 class="text-warning">{{ stats.pending|default:"0" }}</h3>
-                    <small class="text-muted">รอตรวจ (AI ตรวจแล้ว)</small>
+                    <small class="text-muted">รอตรวจ</small>
                 </div>
             </div>
         </div>
@@ -124,27 +124,38 @@
                             </div>
                         </td>
 
+                        {# ====================================================== #}
+                        {# ✅ แก้ไขส่วนตรวจสอบสถานะ (Status Logic) ตรงนี้ #}
+                        {# ====================================================== #}
                         <td>
                             {% if item.submission.is_reported %}
-                            <span class="badge bg-danger">
-                                <i class="fas fa-flag"></i> แจ้งปัญหา
-                            </span>
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-flag"></i> แจ้งปัญหา
+                                </span>
 
                             {% elif not item.submission %}
-                            <span class="badge bg-secondary">ยังไม่ส่ง</span>
+                                <span class="badge bg-secondary">ยังไม่ส่ง</span>
 
                             {% else %}
-                            {% if item.submission.status == 'PASSED' %}
-                            <span class="badge bg-success">ผ่านแล้ว</span>
-                            {% elif item.submission.status == 'REJECT' %}
-                            <span class="badge bg-danger">ส่งคืน/แก้ไข</span>
-                            {% elif item.submission.ai_feedback or item.submission.is_graded %}
-                            <span class="badge bg-warning text-dark">รออนุมัติ</span>
-                            {% else %}
-                            <span class="badge bg-info text-dark">รอ AI ตรวจ</span>
-                            {% endif %}
+                                {# ใช้ APPROVED แทน PASSED #}
+                                {% if item.submission.status == 'APPROVED' %}
+                                    <span class="badge bg-success">ผ่านแล้ว</span>
+                                
+                                {# ใช้ REJECTED แทน REJECT #}
+                                {% elif item.submission.status == 'REJECTED' %}
+                                    <span class="badge bg-danger">ส่งคืน/แก้ไข</span>
+                                
+                                {# เพิ่ม GRADED (AI ตรวจเสร็จ รอครู) #}
+                                {% elif item.submission.status == 'GRADED' %}
+                                    <span class="badge bg-info text-dark">AI ตรวจแล้ว</span>
+
+                                {# PENDING (รอ AI) #}
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">กำลังประมวลผล</span>
+                                {% endif %}
                             {% endif %}
                         </td>
+                        {# ====================================================== #}
 
                         <td>
                             {% if item.submission.ai_score %}
@@ -153,9 +164,15 @@
                         </td>
 
                         <td>
-                            {% if item.submission.quiz and item.submission.quiz.is_completed %}
-                            <span class="text-success">{{ item.submission.quiz.score }}</span>
-                            {% else %}-{% endif %}
+                            {% if item.submission.quiz %}
+                                {% if item.submission.quiz.is_completed or item.submission.status == 'APPROVED' %}
+                                    <span class="text-success fw-bold">{{ item.submission.quiz.score }}</span>
+                                {% else %}
+                                    <span class="text-muted small">รอทำ Quiz</span>
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
                         </td>
 
                         <td>
@@ -169,17 +186,17 @@
 
                         <td class="text-end">
                             {% if item.submission %}
-                            {% if item.submission.is_reported %}
-                            <a href="{% url 'teacher:review_submission' item.submission.pk %}"
-                                class="btn btn-danger btn-sm shadow-sm">
-                                <i class="fas fa-search-plus me-1"></i> ตรวจสอบปัญหา
-                            </a>
-                            {% else %}
-                            <a href="{% url 'teacher:review_submission' item.submission.pk %}"
-                                class="btn btn-primary btn-sm">
-                                <i class="fas fa-search"></i>
-                            </a>
-                            {% endif %}
+                                {% if item.submission.is_reported %}
+                                <a href="{% url 'teacher:review_submission' item.submission.pk %}"
+                                    class="btn btn-danger btn-sm shadow-sm">
+                                    <i class="fas fa-search-plus me-1"></i> ตรวจสอบปัญหา
+                                </a>
+                                {% else %}
+                                <a href="{% url 'teacher:review_submission' item.submission.pk %}"
+                                    class="btn btn-primary btn-sm">
+                                    <i class="fas fa-search"></i> ตรวจงาน
+                                </a>
+                                {% endif %}
                             {% else %}
                             <button class="btn btn-outline-secondary btn-sm" disabled><i
                                     class="fas fa-ban"></i></button>

@@ -151,10 +151,11 @@ class Submission(models.Model):
     
     # สถานะของงาน
     STATUS_CHOICES = [
-        ('PENDING', 'รอส่ง/รอตรวจ'),
-        ('GRADED', 'AI ตรวจแล้ว (รออนุมัติ)'),
-        ('PASSED', 'ผ่านแล้ว (Approved)'),
-        ('REJECT', 'ส่งคืนให้แก้ไข (Revision)'),
+        ('PENDING', 'รอ AI ตรวจสอบ'),           # 1. ส่งงานแล้ว
+        ('GRADED', 'AI ตรวจแล้ว (รอครูอนุมัติ)'),  # 2. AI ตรวจแล้ว
+        ('APPROVED', 'ผ่านแล้ว (ทำ Quiz ได้)'),   # 3-4. ครูอนุมัติแล้ว
+        ('COMPLETED', 'เสร็จสมบูรณ์'),           # 5. ทำ Quiz เสร็จแล้ว
+        ('REJECTED', 'ถูกตีกลับ (แก้ไขงาน)'),     # 6. ไม่ผ่าน
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     
@@ -287,3 +288,37 @@ class QuizAnswer(models.Model):
 
     def __str__(self):
         return f"Ans: {self.selected_choice} for {self.question}"
+
+
+# ✅ 1. ตารางเก็บรายชื่อโมเดล (เช่น Gemini Pro, GPT-4o)
+class AIModelOption(models.Model):
+    name = models.CharField(max_length=100, help_text="ชื่อที่แสดงให้เห็น (เช่น Gemini 1.5 Pro)")
+    api_value = models.CharField(max_length=100, help_text="ค่าที่ส่งไป API (เช่น gemini-1.5-pro)")
+    is_active = models.BooleanField(default=True, help_text="เปิดให้เลือกใช้หรือไม่")
+
+
+    def __str__(self):
+        return f"{self.name} ({self.api_value})"
+
+# ✅ 2. ตารางตั้งค่า (แก้จากอันเดิม)
+class AIConfiguration(models.Model):
+    is_active = models.BooleanField(default=True, help_text="เปิด/ปิด ระบบ AI ทั้งหมด")
+    api_key = models.CharField(max_length=255, help_text="Google Generative AI API Key")
+    
+    # เปลี่ยนจาก choices เป็นเก็บค่า string ธรรมดา (แต่เราจะบังคับให้เลือกผ่าน Form)
+    current_model = models.ForeignKey(
+        AIModelOption, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="เลือกโมเดลที่จะใช้งานปัจจุบัน"
+    )
+    
+    last_status_ok = models.BooleanField(default=False, verbose_name="สถานะล่าสุด")
+    last_checked_at = models.DateTimeField(null=True, blank=True, verbose_name="ตรวจสอบเมื่อ")
+    
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        model_name = self.current_model.name if self.current_model else "ยังไม่เลือกโมเดล"
+        return f"AI Config - {self.current_model.name}"

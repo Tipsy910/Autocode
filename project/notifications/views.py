@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.contrib import messages
 from .models import Notification
+from room.models import Room
 
 # ✅ 1. ฟังก์ชันแสดงประวัติการแจ้งเตือนทั้งหมด (History)
 @login_required
@@ -54,4 +55,13 @@ def mark_as_read(request, noti_id):
         return redirect(noti.link)
     
     # ถ้าไม่มีลิงก์ ให้กลับหน้าเดิมที่กดมา
+    return redirect(request.META.get('HTTP_REFERER', '/'))
+
+@login_required
+def mark_all_as_read(request):
+    # 1. ดึงแจ้งเตือนของ User นี้ ที่ยังไม่ได้อ่าน (is_read=False)
+    # 2. สั่ง update ทีเดียวทั้งหมด (ไม่ต้องวนลูป)
+    Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    
+    # 3. เด้งกลับไปหน้าเดิม
     return redirect(request.META.get('HTTP_REFERER', '/'))

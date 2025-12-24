@@ -98,15 +98,24 @@
                     <h5 class="mb-0 fw-bold text-secondary">สถานะงาน</h5>
                     
                     {% if submission %}
-                        {% if submission.status == 'PASSED' %}
-                            <span class="badge bg-success rounded-pill px-3">ผ่าน (Approved)</span>
-                        {% elif submission.status == 'REJECT' %}
-                            <span class="badge bg-danger rounded-pill px-3">ให้แก้ไข (Revise)</span>
-                        {% elif submission.status == 'WAITING' %}
-                            <span class="badge bg-warning text-dark rounded-pill px-3">รอครูตรวจ (Waiting)</span>
+                        {# ======================================================== #}
+                        {# ✅ แก้ไข 1: อัปเดต Badge ให้ตรงกับ Database ใหม่ #}
+                        {# ======================================================== #}
+                        {% if submission.status == 'COMPLETED' %}
+                            <span class="badge bg-success rounded-pill px-3">เสร็จสมบูรณ์</span>
+                        {% elif submission.status == 'APPROVED' %}
+                            <span class="badge bg-primary rounded-pill px-3">ผ่านแล้ว (ทำ Quiz ได้)</span>
+                        {% elif submission.status == 'REJECTED' %}
+                            <span class="badge bg-danger rounded-pill px-3">ถูกตีกลับ (Revise)</span>
+                        {% elif submission.status == 'GRADED' %}
+                            <span class="badge bg-info text-dark rounded-pill px-3">รอครูอนุมัติ</span>
+                        {% elif submission.status == 'PENDING' %}
+                            <span class="badge bg-warning text-dark rounded-pill px-3">รอ AI ตรวจ</span>
                         {% else %}
-                            <span class="badge bg-primary rounded-pill px-3">ส่งแล้ว</span>
+                            <span class="badge bg-secondary rounded-pill px-3">ส่งแล้ว</span>
                         {% endif %}
+                        {# ======================================================== #}
+
                     {% else %}
                         {% if is_overdue %}
                             <span class="badge bg-danger rounded-pill px-3">เลยกำหนด</span>
@@ -303,7 +312,10 @@
                                 {# กรณี B: Quiz ยังไม่สร้าง -> เช็คสถานะงาน #}
                                 {% else %}
                                     
-                                    {% if submission.status == 'PASSED' %}
+                                    {# ======================================================== #}
+                                    {# ✅ แก้ไข 2: Logic ปุ่มสร้าง Quiz ต้องเป็น APPROVED เท่านั้น #}
+                                    {# ======================================================== #}
+                                    {% if submission.status == 'APPROVED' %}
                                         <div class="animate__animated animate__fadeIn">
                                             <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
                                             <h6 class="text-success fw-bold">งานผ่านแล้ว!</h6>
@@ -318,7 +330,7 @@
                                             </form>
                                         </div>
 
-                                    {% elif submission.status == 'REJECT' %}
+                                    {% elif submission.status == 'REJECTED' %}
                                         <div class="text-muted">
                                             <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
                                             <h6 class="fw-bold text-danger">งานต้องแก้ไข</h6>
@@ -326,7 +338,7 @@
                                         </div>
 
                                     {% else %} 
-                                        {# WAITING Status #}
+                                        {# GRADED or PENDING Status #}
                                         <div class="text-muted py-2">
                                             <div class="mb-3">
                                                 <i class="fas fa-clock fa-3x text-warning"></i>
@@ -338,6 +350,8 @@
                                             </p>
                                         </div>
                                     {% endif %}
+                                    {# ======================================================== #}
+
                                 {% endif %}
 
                             {% else %}
@@ -391,9 +405,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // --- 1. Tab Switching & Auto Clear Logic (อัปเกรด) ---
-        // เมื่อเปลี่ยน Tab ให้ล้างค่าในอีก Tab ทิ้ง เพื่อป้องกัน User สับสน
-        
+        // --- 1. Tab Switching & Auto Clear Logic ---
         var triggerTabList = [].slice.call(document.querySelectorAll('#submitTab button'))
         triggerTabList.forEach(function (triggerEl) {
             var tabTrigger = new bootstrap.Tab(triggerEl)
@@ -403,31 +415,26 @@
                 tabTrigger.show()
             })
 
-            // Event เมื่อ Tab ถูกเปลี่ยนเสร็จสิ้น
             triggerEl.addEventListener('shown.bs.tab', function (event) {
-                const activeTabId = event.target.id; // Tab ที่เพิ่งกด (file-tab หรือ url-tab)
+                const activeTabId = event.target.id; 
 
                 if (activeTabId === 'url-tab') {
-                    // ถ้ามา Tab URL -> ให้ล้างค่า File ทิ้ง
                     const fileInput = document.getElementById('{{ file_form.files.id_for_label }}');
                     const fileListPreview = document.getElementById('selected-files-list');
                     const previewContainer = document.getElementById('file-list-preview');
                     
-                    if (fileInput) fileInput.value = ''; // ล้าง Input File
-                    if (fileListPreview) fileListPreview.innerHTML = ''; // ล้าง list
-                    if (previewContainer) previewContainer.style.display = 'none'; // ซ่อน preview
-                    // console.log('Switched to URL: Files cleared');
+                    if (fileInput) fileInput.value = ''; 
+                    if (fileListPreview) fileListPreview.innerHTML = ''; 
+                    if (previewContainer) previewContainer.style.display = 'none'; 
                 } 
                 else if (activeTabId === 'file-tab') {
-                    // ถ้ามา Tab File -> ให้ล้างค่า URL ทิ้ง
                     const urlInput = document.querySelector('input[name="submitted_link"]');
-                    if (urlInput) urlInput.value = ''; // ล้าง Input URL
-                    // console.log('Switched to File: URL cleared');
+                    if (urlInput) urlInput.value = ''; 
                 }
             })
         });
 
-        // --- 2. File Preview Logic (เหมือนเดิม) ---
+        // --- 2. File Preview Logic ---
         const fileInput = document.getElementById('{{ file_form.files.id_for_label }}'); 
         const previewContainer = document.getElementById('file-list-preview');
         const fileListElement = document.getElementById('selected-files-list');

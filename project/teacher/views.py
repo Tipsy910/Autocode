@@ -16,6 +16,22 @@ from django.core.mail import send_mail
 from django.core.exceptions import ObjectDoesNotExist # 📌 อย่าลืม import ตัวนี้ไว้บนสุด
 # Create your views here.
 
+def render_not_found(request, title, message, back_url=None):
+    """
+    ฟังก์ชันสำหรับแสดงหน้า Error แบบกำหนดข้อความเองได้
+    :param request: ตัวแปร request
+    :param title: หัวข้อ Error (ตัวหนา)
+    :param message: รายละเอียด Error
+    :param back_url: ลิงก์สำหรับปุ่ม "กลับ" (ถ้าไม่ใส่จะไม่โชว์ปุ่ม)
+    """
+    context = {
+        'error_title': title,
+        'error_description': message,
+        'back_url': back_url
+    }
+    # คุณสามารถเปลี่ยน path ไฟล์ html ตามที่คุณต้องการเก็บได้
+    return render(request, 'common/error_page.html', context)
+
 class teacher_dashboard(LoginRequiredMixin,View):
     template_name = 'teacher/dashboard.html'
 
@@ -102,30 +118,60 @@ class teacher_dashboard(LoginRequiredMixin,View):
 
 @login_required
 def teacher_room_detail_view(request, pk):
-    # ---------------------------------------------------------
-    # 1. ส่วนดึงข้อมูลห้อง (Room Retrieval & Permission)
+# ---------------------------------------------------------
+    # 0. ตรวจสอบว่าเป็นบัญชีครูหรือไม่
     # ---------------------------------------------------------
     try:
         teacher_profile = request.user.teacher_profile
     except AttributeError:
-        return redirect('teacher:dashboard')
-
-    # ดึงห้องที่ user เป็นเจ้าของ OR เป็นครูผู้ช่วย (แก้ปัญหาห้องซ้ำด้วย distinct)
-    rooms_queryset = Room.objects.filter(
-        Q(owner=request.user) | Q(teachers=teacher_profile)
-    ).distinct()
-
-    room = get_object_or_404(rooms_queryset, pk=pk)
+        # ถ้าไม่ใช่ครู แจ้งเตือนและส่งกลับหน้าหลัก
+        return render_not_found(
+            request,
+            "บัญชีไม่ถูกต้อง",
+            "หน้านี้สำหรับอาจารย์เท่านั้น",
+            reverse('home')
+        )
 
     # ---------------------------------------------------------
-    # 2. เตรียม Forms (Initialize)
+    # 1. ส่วนดึงข้อมูลห้อง (Room Retrieval)
+    # ---------------------------------------------------------
+    try:
+        # 🔍 ขั้นที่ 1: หาห้องจาก Database ทั้งหมดก่อน (ยังไม่กรองสิทธิ์)
+        room = Room.objects.get(pk=pk)
+    except Room.DoesNotExist:
+        # ❌ กรณี: ห้องหาย / ลิงก์ผิด / ถูกลบไปแล้ว
+        return render_not_found(
+            request,
+            "ไม่พบห้องเรียน",
+            "ห้องเรียนนี้อาจถูกลบไปแล้ว หรือลิงก์ที่คุณกดไม่ถูกต้อง",
+            reverse('teacher:dashboard')
+        )
+
+    # ---------------------------------------------------------
+    # 2. ตรวจสอบสิทธิ์ (Permission Check)
+    # ---------------------------------------------------------
+    # เช็คว่า: เป็นเจ้าของห้อง (Owner) หรือ เป็นครูผู้ช่วย (Co-teacher)
+    is_owner = (room.owner == request.user)
+    is_co_teacher = room.teachers.filter(pk=teacher_profile.pk).exists()
+
+    if not (is_owner or is_co_teacher):
+        # ⛔ กรณี: ห้องมีอยู่จริง แต่ครูคนนี้ไม่ใช่คนสอน
+        return render_not_found(
+            request,
+            "ไม่มีสิทธิ์เข้าถึง",
+            f"คุณไม่ใช่ผู้สอนในรายวิชา '{room.name}' จึงไม่สามารถจัดการห้องเรียนนี้ได้",
+            reverse('teacher:dashboard')
+        )
+
+    # ---------------------------------------------------------
+    # 3. เตรียม Forms (Initialize)
     # ---------------------------------------------------------
     # สร้างฟอร์มเปล่าๆ ไว้ก่อน เพื่อส่งไป render กรณีเป็น GET request
     edit_form = RoomForm(instance=room) 
     announcement_form = AnnouncementForm()
 
     # ---------------------------------------------------------
-    # 3. จัดการ POST Requests (เมื่อมีการกดปุ่ม Submit)
+    # 4. จัดการ POST Requests (เมื่อมีการกดปุ่ม Submit)
     # ---------------------------------------------------------
     if request.method == 'POST':
         # รับค่าจาก hidden input ที่เราฝังไว้ใน HTML เพื่อดูว่าทำรายการอะไร
@@ -162,7 +208,7 @@ def teacher_room_detail_view(request, pk):
                 return redirect('room:teacher_detail', pk=room.pk)
     
     # ---------------------------------------------------------
-    # 4. เตรียม Context และ Render
+    # 5. เตรียม Context และ Render
     # ---------------------------------------------------------
     students_in_room = room.students.all().order_by('user__first_name', 'user__last_name')
     assignments = Assignment.objects.filter(room=room).order_by('-created_at')
@@ -514,7 +560,7 @@ def review_submission_view(request, pk):
     # 1. ดึงข้อมูลงานส่ง
     submission = get_object_or_404(Submission, pk=pk)
     
-    # 2. เช็คสิทธิ์
+    # 2. เช็คสิทธิ์ (อาจารย์เจ้าของวิชา หรือ TA)
     assignment = submission.assignment
     is_owner = assignment.room.owner == request.user
     is_ta = hasattr(request.user, 'teacher_profile') and assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists()
@@ -548,30 +594,31 @@ def review_submission_view(request, pk):
             new_comment = form.cleaned_data['feedback']
             new_quiz_score = form.cleaned_data.get('quiz_score')
 
-            # --- อัปเดตข้อมูล Submission ---
+            # --- อัปเดตข้อมูล Submission พื้นฐาน ---
             submission.teacher_comment = new_comment
             submission.ai_score = new_ai_score
             submission.graded_at = timezone.now()
-            submission.is_reported = False 
-            submission.is_graded = True 
-
+            submission.is_graded = True # เก็บไว้เผื่อใช้ logic เดิมร่วมด้วย
+            
             # --- ✅ STEP 2: อัปเดต Quiz เฉพาะตอนที่มี Quiz อยู่จริงเท่านั้น ---
             if quiz_instance and new_quiz_score is not None:
                 quiz_instance.score = new_quiz_score
                 quiz_instance.save()
                 current_quiz_score = new_quiz_score
 
-            # --- คำนวณคะแนนรวม ---
+            # --- คำนวณคะแนนรวม (AI + Quiz) ---
             ai_part = submission.ai_score if submission.ai_score else 0
             submission.score = ai_part + current_quiz_score
 
             # ========================================================
-            # ✅ CASE 1: อนุมัติ (APPROVE) -> สถานะ PASSED
+            # ✅ CASE 1: อนุมัติ (APPROVE) -> สถานะเปลี่ยนเป็น APPROVED
             # ========================================================
             if action == 'approve':
-                submission.status = 'PASSED'
+                # UPDATE: ใช้ APPROVED ตาม model ใหม่ (เพื่อให้ปุ่มทำ Quiz ขึ้นฝั่งนักเรียน)
+                submission.status = 'APPROVED' 
                 
                 # --- ลบ Quiz เก่าทิ้งเพื่อให้สร้างใหม่ (Safe Delete) ---
+                # เพราะถ้านักเรียนเคยทำแล้วแต่ครูให้ผ่านใหม่ นักเรียนควรได้ทำ Quiz ใหม่หรือใช้ตัวเดิม
                 if quiz_instance:
                     try:
                         quiz_instance.delete()
@@ -580,20 +627,21 @@ def review_submission_view(request, pk):
                     except Exception as e:
                         print(f"Error deleting quiz: {e}")
 
-                # รีเซ็ต flag เพื่อให้ปุ่ม 'เริ่มทำแบบทดสอบ' โผล่ที่ฝั่งนักเรียน
+                # รีเซ็ต flag เพื่อให้ระบบรู้ว่ายังไม่มี Quiz (ปุ่ม 'เริ่มทำแบบทดสอบ' จะโผล่)
                 submission.quiz_generated = False 
                 
-                submission.save() # 🔔 Signal จะทำงานที่นี่ (แจ้งเตือน + ส่งเมล)
-                messages.success(request, "อนุมัติงานเรียบร้อย (ระบบกำลังแจ้งเตือนนักเรียน)")
+                submission.save() 
+                messages.success(request, "อนุมัติงานเรียบร้อย (นักเรียนสามารถเริ่มทำ Quiz ได้แล้ว)")
 
             # ========================================================
-            # ❌ CASE 2: ส่งคืน (REJECT) -> สถานะ REJECT
+            # ❌ CASE 2: ส่งคืน (REJECT) -> สถานะเปลี่ยนเป็น REJECTED
             # ========================================================
             elif action == 'reject':
-                submission.status = 'REJECT'
+                # UPDATE: ใช้ REJECTED ตาม model ใหม่
+                submission.status = 'REJECTED'
                 submission.is_graded = False 
                 
-                # --- ลบ Quiz ทิ้ง (ถ้ามี) ---
+                # --- ลบ Quiz ทิ้ง (ถ้ามี) เพราะงานไม่ผ่าน ---
                 submission.quiz_generated = False
                 if quiz_instance:
                     try:
@@ -601,13 +649,17 @@ def review_submission_view(request, pk):
                     except:
                         pass
                 
-                submission.save() # 🔔 Signal จะทำงานที่นี่ (แจ้งเตือน + ส่งเมล)
-                messages.warning(request, "ส่งคืนงานเรียบร้อย (ระบบกำลังแจ้งเตือนนักเรียน)")
+                submission.save()
+                messages.warning(request, "ส่งคืนงานเรียบร้อย (แจ้งเตือนให้นักเรียนแก้ไข)")
 
             # ========================================================
-            # 💾 CASE 3: บันทึกเฉยๆ (Save Draft)
+            # 💾 CASE 3: บันทึกเฉยๆ (Save Draft / Update Score)
             # ========================================================
             else:
+                # ถ้าสถานะเดิมคือ PENDING ให้เปลี่ยนเป็น GRADED (AI ตรวจแล้ว/ครูตรวจแล้ว)
+                if submission.status == 'PENDING':
+                    submission.status = 'GRADED'
+                
                 submission.save()
                 messages.success(request, "บันทึกข้อมูลเรียบร้อย")
             

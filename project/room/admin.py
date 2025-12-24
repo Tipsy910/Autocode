@@ -1,8 +1,11 @@
-from django.contrib import admin
-from .models import Room, Assignment, SubmissionType, Announcement, AnnouncementFile
+from django.contrib import admin,messages
+from .models import Room, Assignment, SubmissionType, Announcement, AnnouncementFile,AIConfiguration, AIModelOption
 from django.utils.html import format_html 
 from django.urls import reverse
 from django.utils import timezone
+from .utils import test_ai_connection # อย่าลืม import ฟังก์ชันเทสที่เราเคยเขียน
+from django.shortcuts import redirect
+from .forms import AIConfigurationForm
 
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
@@ -141,3 +144,104 @@ class AnnouncementAdmin(admin.ModelAdmin):
 @admin.register(SubmissionType)
 class SubmissionTypeAdmin(admin.ModelAdmin):
     list_display = ('name',)
+
+@admin.register(AIModelOption)
+class AIModelOptionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'api_value', 'is_active')
+    search_fields = ('name', 'api_value')
+
+
+@admin.register(AIConfiguration)
+class AIConfigurationAdmin(admin.ModelAdmin):
+    # =========================================================
+    # 1. Configuration (ส่วนตั้งค่าพื้นฐาน)
+    # =========================================================
+    form = AIConfigurationForm
+    change_form_template = 'admin/room/aiconfiguration/change_form.html'
+    change_list_template = 'admin/room/aiconfiguration/change_list.html'
+    
+    list_display = ('current_model', 'is_active', 'show_connection_status', 'last_checked_at')
+    list_filter = ('is_active', 'last_status_ok')
+    ordering = ('-is_active', '-updated_at')
+
+    # =========================================================
+    # 2. View Overrides (ส่วนแทรกแซงการแสดงผลหน้าเว็บ)
+    # =========================================================
+    
+    # แทรกข้อมูล active_config ไปที่หน้า List (เพื่อแสดง Banner ด้านบน)
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        active_config = AIConfiguration.objects.filter(is_active=True).first()
+        extra_context['active_config'] = active_config
+        return super().changelist_view(request, extra_context=extra_context)
+
+    # =========================================================
+    # 3. Save Logic (ส่วนจัดการข้อมูลตอนบันทึก)
+    # =========================================================
+
+    # Logic: "เลือก 1 แล้วปิดที่เหลือ"
+    def save_model(self, request, obj, form, change):
+        if obj.is_active:
+            # สั่งปิดตัวอื่นทั้งหมด ยกเว้นตัวที่กำลังเซฟ
+            AIConfiguration.objects.exclude(pk=obj.pk).update(is_active=False)
+            messages.info(request, f"ระบบได้ปรับ {obj.current_model} เป็นตัวหลัก และปิดตัวอื่นให้แล้ว")
+
+        super().save_model(request, obj, form, change)
+
+    # =========================================================
+    # 4. Button Handlers (ส่วนจัดการปุ่ม Custom)
+    # =========================================================
+
+    # ดักจับปุ่มกดในหน้า "แก้ไข"
+    def response_change(self, request, obj):
+        if "_test_connection" in request.POST:
+            return self.perform_test_and_save(request, obj)
+        return super().response_change(request, obj)
+
+    # ดักจับปุ่มกดในหน้า "เพิ่มใหม่"
+    def response_add(self, request, obj, post_url_continue=None):
+        if "_test_connection" in request.POST:
+            return self.perform_test_and_save(request, obj)
+        return super().response_add(request, obj, post_url_continue)
+
+    # ฟังก์ชันช่วย Test Connection (Helper Function)
+    def perform_test_and_save(self, request, obj):
+        
+        if not obj.current_model:
+            self.message_user(request, "กรุณาเลือกโมเดลก่อนทดสอบ", level=messages.WARNING)
+            
+            return super().response_change(request, obj)
+
+        success, result_msg = test_ai_connection(obj.api_key, obj.current_model.api_value)
+
+        obj.last_status_ok = success
+        obj.last_checked_at = timezone.now()
+        obj.save(update_fields=['last_status_ok', 'last_checked_at'])
+
+        if success:
+            self.message_user(request, f"✅ {obj.current_model.name}: {result_msg}", level=messages.SUCCESS)
+        else:
+            self.message_user(request, f"❌ {obj.current_model.name}: {result_msg}", level=messages.ERROR)
+        
+        return super().response_change(request, obj)
+
+    # =========================================================
+    # 5. Display Methods (ส่วนตกแต่งตาราง)
+    # =========================================================
+
+    # สร้างป้าย Badge สถานะ
+    def show_connection_status(self, obj):
+        if obj.last_status_ok:
+            return format_html(
+                '<span style="background-color:#28a745; color:white; padding:5px 12px; border-radius:20px; font-weight:bold; font-size:12px;">✅ พร้อมใช้งาน</span>'
+            )
+        elif obj.last_checked_at is None:
+            return format_html(
+                '<span style="background-color:#6c757d; color:white; padding:5px 12px; border-radius:20px; font-size:12px;">⚪ รอการตรวจสอบ</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background-color:#dc3545; color:white; padding:5px 12px; border-radius:20px; font-weight:bold; font-size:12px;">❌ เชื่อมต่อไม่ได้</span>'
+            )
+    
+    show_connection_status.short_description = "สถานะ API"

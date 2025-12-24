@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% load room_tags %}{% block title %}{{ room.name }} - {{ block.super }}{% endblock %}
+{% block title %}{{ room.name }} - {{ block.super }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4 mb-5">
@@ -14,9 +14,21 @@
     </div>
 
     <ul class="nav nav-tabs nav-fill mb-4" id="roomTab" role="tablist">
-        <li class="nav-item" role="presentation"><button class="nav-link active" id="stream-tab" data-bs-toggle="tab" data-bs-target="#stream-tab-pane" type="button"><i class="fas fa-stream me-2"></i>กระดานสนทนา</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments-tab-pane" type="button"><i class="fas fa-tasks me-2"></i>งานของชั้นเรียน</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="people-tab" data-bs-toggle="tab" data-bs-target="#people-tab-pane" type="button"><i class="fas fa-users me-2"></i>ผู้คน</button></li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="stream-tab" data-bs-toggle="tab" data-bs-target="#stream-tab-pane" type="button">
+                <i class="fas fa-stream me-2"></i>กระดานสนทนา
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments-tab-pane" type="button">
+                <i class="fas fa-tasks me-2"></i>งานของชั้นเรียน
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="people-tab" data-bs-toggle="tab" data-bs-target="#people-tab-pane" type="button">
+                <i class="fas fa-users me-2"></i>ผู้คน
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content" id="roomTabContent">
@@ -26,15 +38,22 @@
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex w-100 justify-content-between">
-                        <h5 class="card-title mb-1"><i class="fas fa-bullhorn text-primary me-2"></i> ประกาศโดย {{ announcement.author.get_full_name|default:announcement.author.email }}</h5>
+                        <h5 class="card-title mb-1">
+                            <i class="fas fa-bullhorn text-primary me-2"></i> 
+                            ประกาศโดย {{ announcement.author.get_full_name|default:announcement.author.email }}
+                        </h5>
                         <small class="text-muted">{{ announcement.created_at|date:"d M Y, H:i" }}</small>
                     </div>
                     <p class="card-text mt-2">{{ announcement.content|linebreaksbr }}</p>
+                    
                     {% if announcement.files.all %}
-                        <hr><p class="mb-2"><strong>ไฟล์แนบ:</strong></p>
+                        <hr>
+                        <p class="mb-2"><strong>ไฟล์แนบ:</strong></p>
                         <div class="list-group list-group-flush">
                         {% for attachment in announcement.files.all %}
-                            <a href="{{ attachment.file.url }}" target="_blank" class="list-group-item list-group-item-action list-group-item-light py-2 px-3"><i class="fas fa-paperclip me-2"></i> {{ attachment }}</a>
+                            <a href="{{ attachment.file.url }}" target="_blank" class="list-group-item list-group-item-action list-group-item-light py-2 px-3">
+                                <i class="fas fa-paperclip me-2"></i> {{ attachment }}
+                            </a>
                         {% endfor %}
                         </div>
                     {% endif %}
@@ -49,18 +68,72 @@
             <h3 class="mb-3">รายการงานที่ได้รับมอบหมาย</h3>
             <div class="list-group">
                 {% for assignment in assignments %}
-                <a href="{% url 'student:assignment_detail' pk=assignment.pk %}" class="list-group-item list-group-item-action mb-2 shadow-sm"> {# TODO: สร้าง URL 'student:assignment_detail' #}
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1"><i class="fas fa-clipboard-list text-info me-2"></i>{{ assignment.title }}</h5>
-                        {% if assignment.submission_status == 'SUBMITTED' %}
-                            <span class="badge bg-success">ส่งแล้ว</span>
-                        {% elif assignment.submission_status == 'GRADED' %}
-                            <span class="badge bg-primary">ตรวจแล้ว</span>
-                        {% else %}
-                            <span class="badge bg-warning text-dark">ยังไม่ได้ส่ง</span>
-                        {% endif %}
+                <a href="{% url 'student:assignment_detail' pk=assignment.pk %}" class="list-group-item list-group-item-action mb-2 shadow-sm">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        
+                        <h5 class="mb-1 text-truncate" style="max-width: 60%;">
+                            <i class="fas fa-code text-success me-2"></i>{{ assignment.title }}
+                        </h5>
+                        
+                        <div class="ms-auto"> 
+                            {# ====================================================== #}
+                            {# ✅ ส่วนที่แก้ไข: ปรับ Badge ให้ตรงกับ Database Status #}
+                            {# ====================================================== #}
+
+                            {# 1. ทำ Quiz เสร็จแล้ว -> COMPLETED #}
+                            {% if assignment.submission_status == 'COMPLETED' %}
+                                <span class="badge bg-success rounded-pill">
+                                    <i class="fas fa-flag-checkered me-1"></i> เสร็จสมบูรณ์ (Completed)
+                                </span>
+
+                            {# 2. ครูอนุมัติแล้ว (รอทำ Quiz) -> APPROVED (แทน PASSED เดิม) #}
+                            {% elif assignment.submission_status == 'APPROVED' %}
+                                <span class="badge bg-primary rounded-pill">
+                                    <i class="fas fa-play-circle me-1"></i> ผ่านแล้ว (ทำ Quiz ได้)
+                                </span>
+
+                            {# 3. AI ตรวจแล้ว รอครู -> GRADED #}
+                            {% elif assignment.submission_status == 'GRADED' %}
+                                <span class="badge bg-info text-dark rounded-pill">
+                                    <i class="fas fa-chalkboard-teacher me-1"></i> รอครูอนุมัติ (Waiting)
+                                </span>
+
+                            {# 4. ถูกตีกลับ -> REJECTED (แทน REJECT เดิม) #}
+                            {% elif assignment.submission_status == 'REJECTED' %}
+                                <span class="badge bg-danger rounded-pill">
+                                    <i class="fas fa-exclamation-circle me-1"></i> ถูกตีกลับ (ส่งใหม่)
+                                </span>
+
+                            {# 5. รอ AI ตรวจ -> PENDING #}
+                            {% elif assignment.submission_status == 'PENDING' %}
+                                <span class="badge bg-warning text-dark rounded-pill">
+                                    <i class="fas fa-hourglass-half me-1"></i> รอ AI ตรวจ
+                                </span>
+
+                            {# 6. เลยกำหนดส่ง -> MISSING #}
+                            {% elif assignment.submission_status == 'MISSING' %}
+                                <span class="badge bg-secondary rounded-pill">
+                                    <i class="fas fa-clock me-1"></i> เลยกำหนดส่ง
+                                </span>
+
+                            {# 7. ยังไม่ส่ง #}
+                            {% else %}
+                                <span class="badge bg-light text-dark border rounded-pill">
+                                    ยังไม่ได้ส่ง
+                                </span>
+                            {% endif %}
+                            {# ====================================================== #}
+                        </div>
+
                     </div>
-                    <p class="mb-1 text-muted">{% if assignment.due_date %}กำหนดส่ง: {{ assignment.due_date|date:"d F Y, H:i" }}{% else %}ไม่มีกำหนดส่ง{% endif %}</p>
+                    <p class="mb-1 text-muted">
+                        {% if assignment.due_date %}
+                            กำหนดส่ง: {{ assignment.due_date|date:"d F Y, H:i" }}
+                        {% else %}
+                            ไม่มีกำหนดส่ง
+                        {% endif %}
+                        <span class="ms-2">| คะแนนเต็ม: {{ assignment.score }}</span>
+                    </p>
                 </a>
                 {% empty %}
                 <div class="alert alert-info text-center" role="alert">ยังไม่มีงานที่ได้รับมอบหมาย</div>
@@ -71,12 +144,30 @@
         <div class="tab-pane fade" id="people-tab-pane" role="tabpanel">
             <h3 class="text-primary border-bottom pb-2 mb-3">คณาจารย์</h3>
             <ul class="list-group list-group-flush mb-4">
-                <li class="list-group-item d-flex align-items-center"><i class="fas fa-user-tie fa-lg text-muted me-3"></i><span>{{ room.owner.get_full_name|default:room.owner.email }} (เจ้าของห้อง)</span></li>
-                {% for teacher in room.teachers.all %}{% if teacher.user != room.owner %}<li class="list-group-item d-flex align-items-center"><i class="fas fa-user-circle fa-lg text-muted me-3"></i><span>{{ teacher.user.get_full_name|default:teacher.user.email }}</span></li>{% endif %}{% endfor %}
+                <li class="list-group-item d-flex align-items-center">
+                    <i class="fas fa-user-tie fa-lg text-muted me-3"></i>
+                    <span>{{ room.owner.get_full_name|default:room.owner.email }} (เจ้าของห้อง)</span>
+                </li>
+                {% for teacher in room.teachers.all %}
+                    {% if teacher.user != room.owner %}
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="fas fa-user-circle fa-lg text-muted me-3"></i>
+                        <span>{{ teacher.user.get_full_name|default:teacher.user.email }}</span>
+                    </li>
+                    {% endif %}
+                {% endfor %}
             </ul>
+
             <h3 class="text-primary border-bottom pb-2 mb-3 mt-5">เพื่อนร่วมชั้นเรียน</h3>
             <ul class="list-group list-group-flush">
-                {% for student in room.students.all %}<li class="list-group-item d-flex align-items-center"><i class="fas fa-user-graduate text-muted me-3"></i><span>{{ student.user.get_full_name|default:student.user.email }}</span></li>{% empty %}<li class="list-group-item">ยังไม่มีนักเรียนในห้องนี้</li>{% endfor %}
+                {% for student in room.students.all %}
+                <li class="list-group-item d-flex align-items-center">
+                    <i class="fas fa-user-graduate text-muted me-3"></i>
+                    <span>{{ student.user.get_full_name|default:student.user.email }}</span>
+                </li>
+                {% empty %}
+                <li class="list-group-item">ยังไม่มีนักเรียนในห้องนี้</li>
+                {% endfor %}
             </ul>
         </div>
     </div>

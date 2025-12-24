@@ -97,9 +97,9 @@ def notify_submission_status_change(sender, instance, created, **kwargs):
     should_notify = False
     
     # =========================================================
-    # CASE 1: งานผ่าน (PASSED)
+    # CASE 1: งานผ่าน (APPROVED)
     # =========================================================
-    if submission.status == 'PASSED':
+    if submission.status == 'APPROVED':
         message = f"✅ งานผ่านแล้ว: {assignment.title}"
         should_notify = True
         
@@ -129,9 +129,9 @@ def notify_submission_status_change(sender, instance, created, **kwargs):
             print(f"❌ Failed to send Approve Email: {e}")
 
     # =========================================================
-    # CASE 2: ส่งคืน (REJECT)
+    # CASE 2: ส่งคืน (REJECTED)
     # =========================================================
-    elif submission.status == 'REJECT':
+    elif submission.status == 'REJECTED':
         message = f"⚠️ งานถูกส่งคืน: {assignment.title} (กรุณาแก้ไข)"
         should_notify = True
 

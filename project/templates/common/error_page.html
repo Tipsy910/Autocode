@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 60vh;">
+    
+    <div class="mb-4 text-secondary">
+        <i class="fas fa-search-minus fa-6x opacity-50"></i>
+    </div>
+
+    <h2 class="fw-bold text-dark mb-3">
+        {{ error_title|default:"ไม่พบข้อมูลที่คุณค้นหา" }}
+    </h2>
+
+    <p class="text-muted mb-4 text-center" style="max-width: 500px;">
+        {{ error_message|default:"ข้อมูลนี้อาจถูกลบไปแล้ว หรือคุณไม่มีสิทธิ์เข้าถึงหน้านี้" }}
+    </p>
+
+    <a href="{{ back_url|default:'/' }}" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm">
+        <i class="fas fa-arrow-left me-2"></i> กลับหน้ารายการ
+    </a>
+
+</div>
+{% endblock %}

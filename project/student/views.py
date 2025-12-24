@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404 ,reverse
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
@@ -15,89 +15,22 @@ from datetime import timedelta
 import requests
 from urllib.parse import urlparse
 import json
-import ast 
 
-def check_colab_link_accessibility(url):
+def render_not_found(request, title, message, back_url=None):
     """
-    ฟังก์ชันช่วยเช็ค:
-    1. รูปแบบ URL ถูกต้อง
-    2. Domain คือ colab.research.google.com เป๊ะๆ
-    3. ลิงก์เปิดได้จริง (Public) ไม่ติด Login
+    ฟังก์ชันสำหรับแสดงหน้า Error แบบกำหนดข้อความเองได้
+    :param request: ตัวแปร request
+    :param title: หัวข้อ Error (ตัวหนา)
+    :param message: รายละเอียด Error
+    :param back_url: ลิงก์สำหรับปุ่ม "กลับ" (ถ้าไม่ใส่จะไม่โชว์ปุ่ม)
     """
-    # 1. เช็ค Domain แบบเข้มงวด
-    try:
-        parsed = urlparse(url)
-        # ตรวจว่าต้องเป็น https และ domain ต้องเป๊ะ
-        if parsed.scheme != "https" or parsed.netloc != "colab.research.google.com":
-            return False, "ลิงก์ต้องขึ้นต้นด้วย https://colab.research.google.com/ เท่านั้น"
-    except Exception:
-        return False, "รูปแบบ URL ไม่ถูกต้อง"
-
-    # 2. ยิง Request ไปเช็คว่าลิงก์เปิดได้ไหม (Ping)
-    try:
-        # ใส่ User-Agent เพื่อไม่ให้ Google บล็อกว่าเราเป็นบอท
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        
-        # timeout=5 คือถ้าเกิน 5 วิให้ตัดจบ (กันเว็บค้าง)
-        response = requests.get(url, headers=headers, timeout=5)
-
-        # ถ้า Google Redirect ไปหน้า Login (accounts.google.com) แสดงว่าไม่ได้เปิดแชร์
-        if "accounts.google.com" in response.url or "signin" in response.url:
-            return False, "ลิงก์นี้เป็นส่วนตัว (Private) กรุณาเปิดแชร์เป็น 'Anyone with the link' (ทุกคนที่มีลิงก์)"
-        
-        # ถ้า Response ไม่ใช่ 200 OK
-        if response.status_code != 200:
-            return False, f"ไม่สามารถเข้าถึงลิงก์ได้ (Status: {response.status_code})"
-            
-    except requests.exceptions.RequestException:
-        return False, "ไม่สามารถเชื่อมต่อกับลิงก์ได้ (ลิงก์อาจเสียหรือหมดอายุ)"
-
-    return True, ""
-
-def validate_file_content(uploaded_file):
-    """
-    ฟังก์ชันเปิดอ่านเนื้อหาไฟล์เพื่อเช็คว่าเป็น .py หรือ .ipynb ของจริงหรือไม่
-    """
-    filename = uploaded_file.name.lower()
-    
-    try:
-        # อ่านไฟล์ทั้งหมดขึ้นมาใน Memory เพื่อตรวจสอบ
-        content = uploaded_file.read()
-        
-        # ⚠️ สำคัญมาก: อ่านเสร็จต้องเลื่อน cursor กลับไปที่จุดเริ่มต้น (0) 
-        # ไม่งั้นตอน save ลง database ไฟล์จะกลายเป็นไฟล์เปล่า
-        uploaded_file.seek(0)
-        
-        # --- กรณีเป็น .ipynb (ต้องเป็น JSON และมีคีย์ 'cells') ---
-        if filename.endswith('.ipynb'):
-            try:
-                # ลองแปลง bytes เป็น string แล้วโหลด JSON
-                data = json.loads(content.decode('utf-8'))
-                
-                # เช็คโครงสร้างพื้นฐานของ Notebook
-                if 'cells' not in data or 'metadata' not in data:
-                    return False, "ไฟล์ .ipynb เสียหาย หรือโครงสร้างไม่ถูกต้อง"
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                return False, "ไม่ใช่ไฟล์ Jupyter Notebook ที่ถูกต้อง (อาจเป็นไฟล์อื่นเปลี่ยนนามสกุลมา)"
-
-        # --- กรณีเป็น .py (ต้องเป็น Text ที่ Compile เป็น Python ได้) ---
-        elif filename.endswith('.py'):
-            try:
-                source_code = content.decode('utf-8')
-                # ลอง parse ดูว่าเป็น Python Syntax หรือไม่
-                ast.parse(source_code)
-            except UnicodeDecodeError:
-                return False, "ไฟล์นี้ไม่ใช่ Text File (อาจเป็น Binary/Image เปลี่ยนชื่อมา)"
-            except SyntaxError:
-                # ถ้า Parse ไม่ผ่าน แปลว่า Syntax ผิด แต่ก็ยังถือว่าเป็น Text File ได้ 
-                # แต่ถ้าจะเอาชัวร์ว่าส่งโค้ดรันได้ ให้ return False ตรงนี้ได้เลย
-                # ในที่นี้ขออนุญาตปล่อยผ่านกรณี Syntax Error (เผื่อเด็กเขียนโค้ดผิดแต่ส่งไฟล์ถูกประเภท)
-                pass 
-                
-    except Exception as e:
-        return False, f"เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}"
-
-    return True, ""
+    context = {
+        'error_title': title,
+        'error_description': message,
+        'back_url': back_url
+    }
+    # คุณสามารถเปลี่ยน path ไฟล์ html ตามที่คุณต้องการเก็บได้
+    return render(request, 'common/error_page.html', context)
 
 class student_dashboard(LoginRequiredMixin, View):
     template_name = 'student/dashboard.html'
@@ -158,47 +91,60 @@ class student_dashboard(LoginRequiredMixin, View):
 
 @login_required
 def student_room_detail_view(request, pk):
-    # ดึงข้อมูลห้องเรียน
     room = get_object_or_404(Room, pk=pk)
+    
+    # ดึงงานทั้งหมดในห้องเรียน
+    assignments = room.assignments.all().order_by('-created_at')
+    
+    # ดึงประกาศ
+    announcements = room.announcements.all().order_by('-created_at')
 
-    # ตรวจสอบสิทธิ์: นักเรียนต้องเป็นสมาชิกของห้องนี้เท่านั้น
-    try:
-        student_profile = request.user.student_profile
-        if not room.students.filter(pk=student_profile.pk).exists():
-            # ถ้าไม่ได้เป็นสมาชิก ให้ redirect หรือแสดงข้อผิดพลาด
-            return redirect('student:dashboard') # กลับไปหน้า dashboard ของนักเรียน
-    except AttributeError:
-        # กรณี User ไม่มี student_profile
-        return redirect('student:dashboard')
-
-    # ดึงข้อมูลประกาศและงานทั้งหมดในห้อง
-    announcements = Announcement.objects.filter(room=room)
-    assignments = Assignment.objects.filter(room=room).order_by('-created_at')
-
-    # --- ส่วนสำคัญ: คำนวณสถานะการส่งงานของนักเรียนคนนี้ ---
-    # ดึงงานทุกชิ้นที่นักเรียนคนนี้เคยส่งในห้องนี้
-    student_submissions = Submission.objects.filter(
-        student=request.user, 
-        assignment__in=assignments
-    )
-    # สร้าง map เพื่อให้ค้นหาได้เร็วขึ้น
-    submission_map = {submission.assignment.id: submission for submission in student_submissions}
-
+    # --- Logic คำนวณสถานะ (Badge) สำหรับ HTML ---
     for assignment in assignments:
-        submission = submission_map.get(assignment.id)
+        # 1. หา Submission ของนักเรียนคนนี้ ในงานนี้
+        submission = Submission.objects.filter(
+            assignment=assignment, 
+            student=request.user
+        ).last()
+
+        current_now = timezone.now()
+
+        # 2. กำหนดสถานะ (submission_status) โดยอิงจาก Database Field 'status' โดยตรง
         if submission:
-            # TODO: ในอนาคตสามารถเช็คสถานะการตรวจ (Graded) ได้ที่นี่
-            assignment.submission_status = 'SUBMITTED'
+            # กรณี 1: ทำ Quiz เสร็จแล้ว -> COMPLETED
+            if submission.status == 'COMPLETED':
+                assignment.submission_status = 'COMPLETED'
+            
+            # กรณี 2: ครูอนุมัติแล้ว (แต่ยังไม่ได้ทำ Quiz หรือกำลังทำ) -> APPROVED
+            elif submission.status == 'APPROVED':
+                assignment.submission_status = 'APPROVED'
+            
+            # กรณี 3: ถูกตีกลับ -> REJECTED
+            elif submission.status == 'REJECTED':
+                assignment.submission_status = 'REJECTED'
+            
+            # กรณี 4: AI ตรวจแล้ว (รอครูอนุมัติ) -> GRADED
+            elif submission.status == 'GRADED':
+                assignment.submission_status = 'GRADED'
+                
+            # กรณี 5: ส่งงานแล้ว (รอ AI ตรวจ) -> PENDING
+            else:
+                assignment.submission_status = 'PENDING'
+                
         else:
-            assignment.submission_status = 'NOT_SUBMITTED'
-    # --- จบส่วนคำนวณสถานะ ---
+            # 3. กรณีไม่มี Submission (ยังไม่ส่ง)
+            if assignment.due_date and current_now > assignment.due_date:
+                # เลยกำหนดส่ง -> MISSING
+                assignment.submission_status = 'MISSING'
+            else:
+                # ยังไม่ถึงกำหนด -> NEW (ยังไม่ส่ง)
+                assignment.submission_status = 'NEW'
 
     context = {
         'room': room,
+        'assignments': assignments,   
         'announcements': announcements,
-        'assignments': assignments,
     }
-
     return render(request, 'student/room_detail.html', context)
 
 @login_required
@@ -207,22 +153,30 @@ def student_assignment_detail_view(request, pk):
     try:
         # พยายามหางาน
         assignment = Assignment.objects.get(pk=pk)
+    
     except Assignment.DoesNotExist:
         # ถ้าหาไม่เจอ (งานถูกลบ) ให้เด้งกลับ Dashboard
-        return render(request, 'student/assignment_not_found.html')
+        return render_not_found(
+            request, 
+            "ไม่พบงาน", 
+            "งานนี้อาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง", 
+            reverse('student:dashboard')
+        )
+    
+    
     user = request.user
     
     # 2. ตรวจสอบว่า User เป็นนักเรียนจริงหรือไม่
     try:
-        if not hasattr(user, 'student_profile'):
-             raise Exception("User has no student profile") 
-        student_profile = user.student_profile
-    except Exception:
+        # ใช้แบบ Direct Access เพื่อความชัวร์
+        student_profile = request.user.student_profile
+    except AttributeError:
         messages.error(request, 'บัญชีของคุณไม่ใช่บัญชีนักเรียน')
         return redirect('student:dashboard')
 
-    # 3. ตรวจสอบสิทธิ์ว่านักเรียนอยู่ในห้องเรียนนี้หรือไม่
-    if student_profile not in assignment.room.students.all():
+    # --- 3. ตรวจสอบสิทธิ์ (แก้ใหม่: ใช้ filter.exists) ---
+    # ใช้ .filter().exists() เร็วกว่าและแม่นยำกว่าการใช้ "not in"
+    if not assignment.room.students.filter(pk=student_profile.pk).exists():
         messages.error(request, 'คุณไม่มีสิทธิ์เข้าถึงงานนี้ (ไม่อยู่ในห้องเรียน)')
         return redirect('student:dashboard')
 
@@ -250,13 +204,25 @@ def student_assignment_detail_view(request, pk):
     disable_reason = ""
 
     # เงื่อนไขที่ 1: งานผ่านแล้ว (PASSED) -> ปิด
-    if submission and submission.status == 'PASSED':
+    if submission and submission.status in ['APPROVED', 'COMPLETED']:
         can_submit = False
-        disable_reason = "งานนี้ผ่านการตรวจสอบแล้ว"
+        disable_reason = "งานนี้ผ่านการตรวจสอบแล้ว (กรุณาทำแบบทดสอบหรือดูคะแนน)"
 
-    # เงื่อนไขที่ 2: เลยกำหนดส่ง และ ไม่อนุญาตให้ส่งช้า (และไม่ใช่การแก้ตัว)
+    # -----------------------------------------------------------
+    # เงื่อนไขที่ 2: รอครูอนุมัติ (GRADED) -> ปิดปุ่มส่ง (กันนักเรียนแก้ตอนครูกำลังตรวจ)
+    # -----------------------------------------------------------
+    # อันนี้เพิ่มให้ครับ: ถ้า AI ตรวจเสร็จแล้ว รอครูมาดู ไม่ควรให้แก้ไฟล์แล้ว
+    elif submission and submission.status == 'GRADED':
+        can_submit = False
+        disable_reason = "งานนี้ AI ตรวจแล้ว กรุณารออาจารย์อนุมัติ"
+
+    # -----------------------------------------------------------
+    # เงื่อนไขที่ 3: เลยกำหนดส่ง และ ไม่อนุญาตให้ส่งช้า
+    # -----------------------------------------------------------
     elif is_overdue and not assignment.allow_late_submission:
-        if submission and submission.status == 'REJECT':
+        # ถ้าสถานะเป็น "ถูกตีกลับ" (REJECTED) -> ให้โอกาสส่งใหม่ได้แม้เลยกำหนด
+        # แก้จาก 'REJECT' เป็น 'REJECTED'
+        if submission and submission.status == 'REJECTED': 
             can_submit = True 
         else:
             can_submit = False
@@ -304,7 +270,7 @@ def student_assignment_detail_view(request, pk):
 
                         # --- ถ้าผ่านทุกด่าน ก็บันทึกตามปกติ ---
                         submission.submitted_at = timezone.now()
-                        submission.status = 'WAITING' 
+                        submission.status = 'GRADED' 
                         submission.is_late = is_overdue
                         submission.is_graded = False
                         
@@ -352,7 +318,7 @@ def student_assignment_detail_view(request, pk):
 
                         # --- ถ้าผ่านทุกไฟล์ Save ได้เลย ---
                         submission.submitted_at = timezone.now()
-                        submission.status = 'WAITING'
+                        submission.status = 'GRADED'
                         submission.is_late = is_overdue
                         submission.is_graded = False
                         
@@ -432,7 +398,7 @@ def generate_quiz_view(request, pk):
     assignment = submission.assignment
     
     # 1. เช็คสิทธิ์ต่างๆ
-    if submission.status != 'PASSED':
+    if submission.status != 'APPROVED':
         messages.error(request, "ไม่สามารถสร้างแบบทดสอบได้ งานยังไม่ได้รับการอนุมัติ")
         return redirect('student:assignment_detail', pk=assignment.pk)
     
