@@ -5,6 +5,12 @@ class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
         fields = ['name','cover_image']
+    
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        if not name or name.strip() == "":
+            raise forms.ValidationError("ชื่อห้องเรียนต้องไม่ใช่ช่องว่างอย่างเดียว")
+        return name
 
 class AssignmentForm(forms.ModelForm):
     # กำหนด widget สำหรับ due_date แยกต่างหากเพื่อให้ปรับแต่งได้ง่าย
@@ -30,7 +36,9 @@ class AssignmentForm(forms.ModelForm):
             'test_case_file', 
             'quiz_question_count', 
             'quiz_choice_count',
-            'enable_ai_quiz'
+            'enable_ai_quiz',
+            'allow_late_submission',
+            'quiz_time_limit',
         ]
         
         # 2. เพิ่ม Label ที่จะแสดงในฟอร์มสำหรับ field ใหม่
@@ -42,6 +50,7 @@ class AssignmentForm(forms.ModelForm):
             'test_case_file': 'ไฟล์ Test Case (สำหรับ AI)',
             'quiz_question_count': 'จำนวนคำถามที่ต้องการให้ AI สร้าง',
             'quiz_choice_count': 'จำนวนตัวเลือกต่อคำถาม',
+            'allow_late_submission': 'อนุญาตให้ส่งเกินเวลา',
         }
         
         # 3. กำหนด Widget สำหรับ field ใหม่ๆ และปรับของเก่าให้สวยงาม
@@ -57,6 +66,9 @@ class AssignmentForm(forms.ModelForm):
                 'role': 'switch',}),
             'quiz_question_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
             'quiz_choice_count': forms.NumberInput(attrs={'class': 'form-control', 'min': '2'}),
+            'allow_late_submission': forms.CheckboxInput(attrs={
+                'class': 'form-check-input', 
+                'role': 'switch',}),
         }
 
 class JoinRoomForm(forms.Form):
@@ -76,3 +88,28 @@ class AnnouncementForm(forms.ModelForm):
         labels = {
             'content': '' # ไม่ต้องแสดง Label
         }
+
+# teacher/forms.py
+
+class GradingForm(forms.Form):
+    # ของเดิมที่มีอยู่
+    score = forms.FloatField(
+        label="คะแนน AI", 
+        required=False, 
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.5'})
+    )
+    
+    # ✅ เพิ่มส่วนนี้: สำหรับแก้ไขคะแนน Quiz
+    quiz_score = forms.FloatField(
+        label="คะแนน Quiz", 
+        required=False, 
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'})
+    )
+
+    feedback = forms.CharField(
+        label="ความเห็นอาจารย์",
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4})
+    )

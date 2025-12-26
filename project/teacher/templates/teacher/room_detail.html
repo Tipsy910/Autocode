@@ -7,6 +7,7 @@
 <div class="container mt-4 mb-5">
 
     <div class="p-5 mb-4 rounded-3 shadow-sm position-relative" style="background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url({% if room.cover_image %}{{ room.cover_image.url }}{% else %}{% static 'img/default_cover.jpg' %}{% endif %}); background-size: cover; background-position: center; color: white;">
+        {% if room.owner == request.user %}
         <div class="position-absolute top-0 end-0 p-3">
             <div class="dropdown">
                 <button class="btn btn-outline-light" type="button" id="roomSettingsDropdown" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-cog"></i></button>
@@ -17,6 +18,7 @@
                 </ul>
             </div>
         </div>
+        {% endif %}
         <div class="container-fluid py-3">
             <h1 class="display-5 fw-bold">{{ room.name }}</h1>
             <p class="fs-5">สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</p>
@@ -35,12 +37,16 @@
         <div class="tab-pane fade show active" id="stream-tab-pane" role="tabpanel">
             <div class="card mb-4 shadow-sm">
                 <div class="card-body">
-                    <form method="POST" action="{% url 'teacher:create_announcement' room_pk=room.pk %}" enctype="multipart/form-data">
+                    <form method="POST" enctype="multipart/form-data" action="{% url 'room:teacher_detail' pk=room.pk %}">
                         {% csrf_token %}
+                        <input type="hidden" name="action" value="post_announcement">
                         <div class="mb-3">{{ announcement_form.content }}</div>
                         <div class="mb-3">
                             <label for="id_attached_files" class="form-label">แนบไฟล์ (เลือกได้หลายไฟล์)</label>
-                            <input type="file" name="attached_files" class="form-control" id="id_attached_files" multiple>
+                            <div class="input-group">
+                                <input type="file" name="attached_files" class="form-control" id="id_attached_files" multiple>
+                                <button class="btn btn-outline-danger" type="button" onclick="document.getElementById('id_attached_files').value = ''"><i class="fas fa-times me-1"></i> ล้างค่า</button>
+                            </div>
                         </div>
                         <div class="text-end"><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-2"></i>โพสต์</button></div>
                     </form>
@@ -56,16 +62,36 @@
                             <small class="text-muted me-3">{{ announcement.created_at|date:"d M Y, H:i" }}</small>
                             {% if announcement.author == request.user %}
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-light" type="button" id="dropdownMenuButton-{{ announcement.pk }}" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v"></i></button>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-{{ announcement.pk }}">
-                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editAnnouncementModal-{{ announcement.pk }}"><i class="fas fa-edit me-2"></i>แก้ไข</a></li>
-                                    <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteAnnouncementModal-{{ announcement.pk }}"><i class="fas fa-trash-alt me-2"></i>ลบ</a></li>
+                                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    
+                                    <li><a class="dropdown-item btn-edit-announcement" href="#" 
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#globalEditAnnouncementModal"
+                                           data-id="{{ announcement.pk }}"
+                                           data-action-url="{% url 'teacher:announcement_edit' pk=announcement.pk %}"
+                                           >
+                                        <i class="fas fa-edit me-2"></i>แก้ไข
+                                    </a></li>
+
+                                    <li><a class="dropdown-item text-danger btn-delete-announcement" href="#" 
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#globalDeleteAnnouncementModal"
+                                           data-action-url="{% url 'teacher:announcement_delete' pk=announcement.pk %}"
+                                           data-preview-text="{{ announcement.content|truncatewords:10 }}"
+                                           >
+                                        <i class="fas fa-trash-alt me-2"></i>ลบ
+                                    </a></li>
                                 </ul>
                             </div>
                             {% endif %}
                         </div>
                     </div>
+                    
                     <p class="card-text mt-2">{{ announcement.content|linebreaksbr }}</p>
+                    
+                    <div id="raw-content-{{ announcement.pk }}" class="d-none">{{ announcement.content }}</div>
+                    
                     {% if announcement.files.all %}
                         <hr><p class="mb-2"><strong>ไฟล์แนบ:</strong></p>
                         <div class="list-group list-group-flush">
@@ -73,35 +99,19 @@
                             <a href="{{ attachment.file.url }}" target="_blank" class="list-group-item list-group-item-action list-group-item-light py-2 px-3"><i class="fas fa-paperclip me-2"></i> {{ attachment }}</a>
                         {% endfor %}
                         </div>
+
+                        <div id="raw-files-list-{{ announcement.pk }}" class="d-none">
+                            {% for file_obj in announcement.files.all %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span class="text-truncate" style="max-width: 250px;"><i class="fas fa-paperclip me-2"></i> {{ file_obj }}</span>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="delete_file_ids" value="{{ file_obj.id }}" id="del_gen_{{ file_obj.id }}">
+                                    <label class="form-check-label text-danger" for="del_gen_{{ file_obj.id }}">ลบ</label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
                     {% endif %}
-                </div>
-            </div>
-
-            <div class="modal fade" id="editAnnouncementModal-{{ announcement.pk }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <form method="post" action="{% url 'teacher:announcement_edit' pk=announcement.pk %}">
-                            {% csrf_token %}
-                            <div class="modal-header"><h5 class="modal-title">แก้ไขประกาศ</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                            <div class="modal-body"><textarea name="content" class="form-control" rows="5">{{ announcement.content }}</textarea></div>
-                            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" class="btn btn-primary">บันทึกการเปลี่ยนแปลง</button></div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal fade" id="deleteAnnouncementModal-{{ announcement.pk }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header"><h5 class="modal-title">ยืนยันการลบประกาศ</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                        <div class="modal-body">
-                            <p>คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้?</p><p class="text-muted border-start border-3 ps-2">"{{ announcement.content|truncatewords:20 }}"</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                            <form action="{% url 'teacher:announcement_delete' pk=announcement.pk %}" method="post">{% csrf_token %}<button type="submit" class="btn btn-danger">ยืนยันการลบ</button></form>
-                        </div>
-                    </div>
                 </div>
             </div>
             {% empty %}
@@ -130,15 +140,70 @@
     </div>
 </div>
 
-<div class="modal fade" id="editRoomModal" tabindex="-1" aria-labelledby="editRoomModalLabel" aria-hidden="true">
+<div class="modal fade" id="globalEditAnnouncementModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="editRoomModalLabel">แก้ไขข้อมูลห้องเรียน: {{ room.name }}</h5>
+                <h5 class="modal-title">แก้ไขประกาศ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" enctype="multipart/form-data" id="globalEditForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">เนื้อหาประกาศ</label>
+                        <textarea name="content" id="globalEditContent" class="form-control" rows="3"></textarea>
+                    </div>
+            
+                    <div class="mb-3 d-none" id="globalEditFilesContainer">
+                        <label class="form-label text-danger">ลบไฟล์เดิม:</label>
+                        <div class="list-group" id="globalEditFilesList">
+                            </div>
+                    </div>
+            
+                    <div class="mb-3">
+                        <label class="form-label text-success">เพิ่มไฟล์ใหม่:</label>
+                        <input type="file" name="new_files" class="form-control" multiple>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="globalDeleteAnnouncementModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">ยืนยันการลบประกาศ</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <p>คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้?</p>
+                <p class="text-muted border-start border-3 ps-2 fst-italic" id="globalDeletePreview">...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <form id="globalDeleteForm" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">ยืนยันการลบ</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editRoomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">แก้ไขข้อมูลห้องเรียน</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" action="{% url 'room:teacher_detail' pk=room.pk %}" enctype="multipart/form-data">
                 {% csrf_token %}
+                <input type="hidden" name="action" value="edit_room">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="{{ edit_form.name.id_for_label }}" class="form-label">{{ edit_form.name.label }}</label>
@@ -147,42 +212,36 @@
                     <div class="mb-3">
                         <label class="form-label">{{ edit_form.cover_image.label }}</label>
                         {% if room.cover_image %}
-                            <p><strong>รูปภาพปัจจุบัน:</strong></p>
-                            <img src="{{ room.cover_image.url }}" class="img-fluid rounded mb-2" alt="Cover image preview" style="max-height: 200px;">
-                        {% else %}
-                            <p class="text-muted">ยังไม่มีรูปภาพ Cover</p>
+                            <img src="{{ room.cover_image.url }}" class="img-fluid rounded mb-2" alt="Cover" style="max-height: 200px;">
                         {% endif %}
-                        <label for="{{ edit_form.cover_image.id_for_label }}" class="form-label mt-2">เปลี่ยนรูปภาพ:</label>
-                        <input type="file" name="{{ edit_form.cover_image.html_name }}" id="{{ edit_form.cover_image.id_for_label }}" class="form-control">
-                        <div class="form-text">เลือกไฟล์ใหม่เพื่อเปลี่ยนแปลง หรือปล่อยว่างไว้เพื่อใช้รูปเดิม</div>
+                        <input type="file" name="{{ edit_form.cover_image.html_name }}" class="form-control mt-2">
                         {% if room.cover_image %}
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" name="cover_image-clear" id="cover_image-clear_id">
-                            <label class="form-check-label" for="cover_image-clear_id">ลบรูปภาพปัจจุบัน (Clear)</label>
+                            <label class="form-check-label" for="cover_image-clear_id">ลบรูปภาพปัจจุบัน</label>
                         </div>
                         {% endif %}
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary">บันทึกการเปลี่ยนแปลง</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-labelledby="deleteRoomModalLabel" aria-hidden="true">
+<div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteRoomModalLabel">ยืนยันการลบ</h5>
+                <h5 class="modal-title">ยืนยันการลบ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>คุณแน่ใจหรือไม่ว่าต้องการลบห้องเรียน</p>
-                <p class="fw-bold">"{{ room.name }}"?</p>
-                <p class="text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลทั้งหมดที่เกี่ยวข้องกับห้องนี้จะถูกลบอย่างถาวร</p>
+                <p>คุณแน่ใจหรือไม่ว่าต้องการลบห้องเรียน <span class="fw-bold">"{{ room.name }}"</span>?</p>
+                <p class="text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
@@ -194,5 +253,60 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        // 1. จัดการ Modal แก้ไข (Edit)
+        var editModal = document.getElementById('globalEditAnnouncementModal');
+        editModal.addEventListener('show.bs.modal', function (event) {
+            // ปุ่มที่กด
+            var button = event.relatedTarget;
+            // ดึงข้อมูลจาก Data Attributes
+            var id = button.getAttribute('data-id');
+            var actionUrl = button.getAttribute('data-action-url');
+            
+            // ดึง Content จาก div ที่ซ่อนอยู่ (ป้องกันปัญหา Line break ใน data attr)
+            var rawContent = document.getElementById('raw-content-' + id).innerText;
+            
+            // อัปเดต Form Action
+            var form = editModal.querySelector('#globalEditForm');
+            form.action = actionUrl;
+            
+            // อัปเดต Textarea
+            editModal.querySelector('#globalEditContent').value = rawContent;
+
+            // จัดการ List ไฟล์ (Copy HTML จาก Hidden div มาใส่ Modal)
+            var filesContainer = editModal.querySelector('#globalEditFilesContainer');
+            var filesListTarget = editModal.querySelector('#globalEditFilesList');
+            var sourceFilesDiv = document.getElementById('raw-files-list-' + id);
+
+            if (sourceFilesDiv) {
+                // มีไฟล์เดิม -> เอา HTML มาใส่
+                filesListTarget.innerHTML = sourceFilesDiv.innerHTML;
+                filesContainer.classList.remove('d-none');
+            } else {
+                // ไม่มีไฟล์เดิม -> ซ่อนส่วนลบไฟล์
+                filesListTarget.innerHTML = '';
+                filesContainer.classList.add('d-none');
+            }
+        });
+
+        // 2. จัดการ Modal ลบ (Delete)
+        var deleteModal = document.getElementById('globalDeleteAnnouncementModal');
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var actionUrl = button.getAttribute('data-action-url');
+            var previewText = button.getAttribute('data-preview-text');
+
+            // อัปเดต Form Action
+            var form = deleteModal.querySelector('#globalDeleteForm');
+            form.action = actionUrl;
+
+            // อัปเดตข้อความตัวอย่าง
+            deleteModal.querySelector('#globalDeletePreview').textContent = '"' + previewText + '..."';
+        });
+    });
+</script>
 
 {% endblock %}

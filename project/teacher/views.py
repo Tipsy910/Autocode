@@ -4,15 +4,35 @@ from django.views import View
 from django.views.generic.edit import DeleteView 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from room.models import Room, generate_invite_code, Assignment,Submission,Announcement, AnnouncementFile
-from .forms import RoomForm, AssignmentForm, JoinRoomForm, AnnouncementForm
+from room.models import *
+from .forms import *
 from django.db.models import Q
 from django.contrib import messages
 from django.utils import timezone
+from datetime import timedelta
+from django.utils.html import strip_tags
+from django.template.loader import render_to_string
+from django.core.mail import send_mail
+from django.core.exceptions import ObjectDoesNotExist # 📌 อย่าลืม import ตัวนี้ไว้บนสุด
 # Create your views here.
 
+def render_not_found(request, title, message, back_url=None):
+    """
+    ฟังก์ชันสำหรับแสดงหน้า Error แบบกำหนดข้อความเองได้
+    :param request: ตัวแปร request
+    :param title: หัวข้อ Error (ตัวหนา)
+    :param message: รายละเอียด Error
+    :param back_url: ลิงก์สำหรับปุ่ม "กลับ" (ถ้าไม่ใส่จะไม่โชว์ปุ่ม)
+    """
+    context = {
+        'error_title': title,
+        'error_description': message,
+        'back_url': back_url
+    }
+    # คุณสามารถเปลี่ยน path ไฟล์ html ตามที่คุณต้องการเก็บได้
+    return render(request, 'common/error_page.html', context)
 
-class teacher_dashboard(View):
+class teacher_dashboard(LoginRequiredMixin,View):
     template_name = 'teacher/dashboard.html'
 
     def get_teacher_profile(self, user):
@@ -95,44 +115,116 @@ class teacher_dashboard(View):
             'join_form': join_form or JoinRoomForm(),
         }
         return render(request, self.template_name, context)
+
 @login_required
 def teacher_room_detail_view(request, pk):
-    # 2. แก้ไข Query ให้ตรวจสอบทั้ง owner และ teachers
-    # ดึงโปรไฟล์อาจารย์ของ user ที่ login อยู่
+# ---------------------------------------------------------
+    # 0. ตรวจสอบว่าเป็นบัญชีครูหรือไม่
+    # ---------------------------------------------------------
     try:
         teacher_profile = request.user.teacher_profile
     except AttributeError:
-        # ถ้า user ไม่มีโปรไฟล์อาจารย์ ก็ไม่ควรเข้าห้องได้
-        return redirect('teacher:dashboard')
+        # ถ้าไม่ใช่ครู แจ้งเตือนและส่งกลับหน้าหลัก
+        return render_not_found(
+            request,
+            "บัญชีไม่ถูกต้อง",
+            "หน้านี้สำหรับอาจารย์เท่านั้น",
+            reverse('home')
+        )
 
-    # ใช้ Q object ในการสร้างเงื่อนไข 'OR'
-    # คือหาห้องที่มี pk ตรงกัน และ (user เป็น owner OR user อยู่ใน list ของ teachers)
-    room = get_object_or_404(
-        Room, 
-        Q(pk=pk) & (Q(owner=request.user) | Q(teachers=teacher_profile))
-    )
-    
-    # --- [ ส่วนจัดการฟอร์มแก้ไข (โค้ดส่วนนี้เหมือนเดิม) ] ---
+    # ---------------------------------------------------------
+    # 1. ส่วนดึงข้อมูลห้อง (Room Retrieval)
+    # ---------------------------------------------------------
+    try:
+        # 🔍 ขั้นที่ 1: หาห้องจาก Database ทั้งหมดก่อน (ยังไม่กรองสิทธิ์)
+        room = Room.objects.get(pk=pk)
+    except Room.DoesNotExist:
+        # ❌ กรณี: ห้องหาย / ลิงก์ผิด / ถูกลบไปแล้ว
+        return render_not_found(
+            request,
+            "ไม่พบห้องเรียน",
+            "ห้องเรียนนี้อาจถูกลบไปแล้ว หรือลิงก์ที่คุณกดไม่ถูกต้อง",
+            reverse('teacher:dashboard')
+        )
+
+    # ---------------------------------------------------------
+    # 2. ตรวจสอบสิทธิ์ (Permission Check)
+    # ---------------------------------------------------------
+    # เช็คว่า: เป็นเจ้าของห้อง (Owner) หรือ เป็นครูผู้ช่วย (Co-teacher)
+    is_owner = (room.owner == request.user)
+    is_co_teacher = room.teachers.filter(pk=teacher_profile.pk).exists()
+
+    if not (is_owner or is_co_teacher):
+        # ⛔ กรณี: ห้องมีอยู่จริง แต่ครูคนนี้ไม่ใช่คนสอน
+        return render_not_found(
+            request,
+            "ไม่มีสิทธิ์เข้าถึง",
+            f"คุณไม่ใช่ผู้สอนในรายวิชา '{room.name}' จึงไม่สามารถจัดการห้องเรียนนี้ได้",
+            reverse('teacher:dashboard')
+        )
+
+    # ---------------------------------------------------------
+    # 3. เตรียม Forms (Initialize)
+    # ---------------------------------------------------------
+    # สร้างฟอร์มเปล่าๆ ไว้ก่อน เพื่อส่งไป render กรณีเป็น GET request
+    edit_form = RoomForm(instance=room) 
+    announcement_form = AnnouncementForm()
+
+    # ---------------------------------------------------------
+    # 4. จัดการ POST Requests (เมื่อมีการกดปุ่ม Submit)
+    # ---------------------------------------------------------
     if request.method == 'POST':
-        form = RoomForm(request.POST, request.FILES, instance=room)
-        if form.is_valid():
-            form.save()
-            return redirect('room:teacher_detail', pk=room.pk)
-    else:
-        form = RoomForm(instance=room)
-    # --- [ จบส่วนจัดการฟอร์ม ] ---
+        # รับค่าจาก hidden input ที่เราฝังไว้ใน HTML เพื่อดูว่าทำรายการอะไร
+        action = request.POST.get('action') 
 
+        # === กรณี A: แก้ไขห้องเรียน (Edit Room) ===
+        if action == 'edit_room':
+            # 🔒 Security Check: ต้องเป็นเจ้าของห้องเท่านั้นถึงแก้ได้
+            if room.owner != request.user:
+                raise PermissionDenied("คุณไม่มีสิทธิ์แก้ไขห้องเรียนนี้")
+            
+            edit_form = RoomForm(request.POST, request.FILES, instance=room)
+            if edit_form.is_valid():
+                edit_form.save()
+                return redirect('room:teacher_detail', pk=room.pk)
+
+        # === กรณี B: สร้างประกาศใหม่ (Post Announcement) ===
+        elif action == 'post_announcement':
+            announcement_form = AnnouncementForm(request.POST)
+            if announcement_form.is_valid():
+                # save(commit=False) เพื่อเติมข้อมูลที่ขาดก่อนบันทึกจริง
+                new_announcement = announcement_form.save(commit=False)
+                new_announcement.room = room            # ผูกกับห้องนี้
+                new_announcement.author = request.user# ผูกกับคนโพสต์
+                new_announcement.save()
+                files = request.FILES.getlist('attached_files') 
+                
+                for f in files:
+                    # สร้าง object AnnouncementFile แยกทีละไฟล์ ผูกกับประกาศนี้
+                    AnnouncementFile.objects.create(
+                        announcement=new_announcement,
+                        file=f
+                    )
+                return redirect('room:teacher_detail', pk=room.pk)
+    
+    # ---------------------------------------------------------
+    # 5. เตรียม Context และ Render
+    # ---------------------------------------------------------
     students_in_room = room.students.all().order_by('user__first_name', 'user__last_name')
     assignments = Assignment.objects.filter(room=room).order_by('-created_at')
-    announcements = Announcement.objects.filter(room=room)
+    # ดึงประกาศทั้งหมด เรียงจากใหม่ไปเก่า
+    announcements = Announcement.objects.filter(room=room).order_by('-created_at') 
+
     context = {
         'room': room,
-        'students_in_room': students_in_room,
-        'edit_form': form,
         'page_title': f"ห้องเรียน: {room.name}",
+        'students_in_room': students_in_room,
         'assignments': assignments,
-        'announcement_form': AnnouncementForm(),
         'announcements': announcements,
+        
+        # ส่งฟอร์มทั้ง 2 ตัวไปยัง Template
+        'edit_form': edit_form,             # สำหรับ Modal แก้ไขห้อง
+        'announcement_form': announcement_form, # สำหรับโพสต์ประกาศ
     }
     return render(request, 'teacher/room_detail.html', context)
 
@@ -163,73 +255,62 @@ class RoomDeleteView(LoginRequiredMixin, DeleteView):
         context['page_title'] = f'ยืนยันการลบห้อง: {self.object.name}'
         return context
 
-@login_required
-def create_announcement(request, room_pk):
-    if request.method == 'POST':
-        room = get_object_or_404(Room, pk=room_pk)
-        
-        # ตรวจสอบสิทธิ์ (โค้ดคล้ายๆ กับ create_assignment)
-        is_owner = (request.user == room.owner)
-        is_teacher = room.teachers.filter(user=request.user).exists()
-        if not (is_owner or is_teacher):
-            messages.error(request, "คุณไม่มีสิทธิ์สร้างประกาศในห้องนี้")
-            return redirect('room:teacher_detail', pk=room_pk)
 
-        form = AnnouncementForm(request.POST)
-        if form.is_valid():
-            announcement = form.save(commit=False)
-            announcement.room = room
-            announcement.author = request.user
+@login_required
+def edit_announcement(request, pk):
+    # ดึงประกาศมา (ต้องเป็นของคนนี้เท่านั้น ถึงจะมีสิทธิ์แก้)
+    announcement = get_object_or_404(Announcement, pk=pk, author=request.user)
+
+    if request.method == 'POST':
+        # 1. อัปเดตเนื้อหาข้อความ
+        new_content = request.POST.get('content')
+        if new_content:
+            announcement.content = new_content
             announcement.save()
 
-            # จัดการไฟล์ที่แนบมาหลายๆ ไฟล์
-            for f in request.FILES.getlist('attached_files'):
-                AnnouncementFile.objects.create(announcement=announcement, file=f)
-            
-            messages.success(request, "สร้างประกาศเรียบร้อยแล้ว")
+        # 2. ลบไฟล์เดิม (ที่เราติ๊กถูกมา)
+        # รับ list ของ ID ที่ต้องการลบ
+        delete_ids = request.POST.getlist('delete_file_ids') 
+        if delete_ids:
+            # ลบเฉพาะไฟล์ที่เป็นของประกาศนี้จริงๆ (เพื่อความปลอดภัย)
+            AnnouncementFile.objects.filter(
+                id__in=delete_ids, 
+                announcement=announcement
+            ).delete()
 
-    # ไม่ว่าจะสำเร็จหรือไม่ ก็กลับไปที่หน้าเดิม
-    return redirect('room:teacher_detail', pk=room_pk)
+        # 3. เพิ่มไฟล์ใหม่ (ถ้ามี)
+        new_files = request.FILES.getlist('new_files')
+        for f in new_files:
+            AnnouncementFile.objects.create(
+                announcement=announcement,
+                file=f
+            )
+
+        # เสร็จแล้วเด้งกลับไปหน้าเดิม
+        return redirect('room:teacher_detail', pk=announcement.room.pk)
+
+    # ถ้าไม่ใช่ POST (หรือ Error) ให้เด้งกลับไปที่เดิม
+    return redirect('room:teacher_detail', pk=announcement.room.pk)
 
 class AnnouncementDeleteView(LoginRequiredMixin, DeleteView):
     model = Announcement
     
     def get_queryset(self):
         """
-        กรองข้อมูลเพื่อความปลอดภัย: ผู้ใช้ลบได้เฉพาะประกาศที่ตัวเองสร้างเท่านั้น
+        ดีมากครับ! การกรองตรงนี้ปลอดภัยที่สุด 
+        ถ้าไม่ใช่เจ้าของ จะหา object ไม่เจอ และเด้ง 404 ให้เอง
         """
         queryset = super().get_queryset()
         return queryset.filter(author=self.request.user)
 
     def get_success_url(self):
         """
-        หลังจากลบสำเร็จ ให้ redirect กลับไปที่หน้ารายละเอียดของห้องเรียน
+        redirect กลับไปที่ห้องเรียน
         """
-        room_pk = self.object.room.pk
+        # self.object ยังคงเข้าถึงได้อยู่แม้จะถูกสั่งลบไปแล้วใน method delete()
+        room_pk = self.object.room.pk 
         messages.success(self.request, "ลบประกาศเรียบร้อยแล้ว")
         return reverse('room:teacher_detail', kwargs={'pk': room_pk})
-
-@login_required
-def edit_announcement(request, pk):
-    # อนุญาตเฉพาะ POST request เท่านั้น เพราะการแก้ไขจะทำผ่านฟอร์มใน Modal
-    if request.method == 'POST':
-        announcement = get_object_or_404(Announcement, pk=pk)
-        
-        # ตรวจสอบสิทธิ์: ต้องเป็นผู้สร้างประกาศเท่านั้น
-        if announcement.author != request.user:
-            messages.error(request, "คุณไม่มีสิทธิ์แก้ไขประกาศนี้")
-            return redirect('room:teacher_detail', pk=announcement.room.pk)
-            
-        # เราใช้ฟอร์มเดิม แต่รับแค่ content มา
-        form = AnnouncementForm(request.POST, instance=announcement)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "แก้ไขประกาศเรียบร้อยแล้ว")
-        else:
-            messages.error(request, "เกิดข้อผิดพลาดในการแก้ไขประกาศ")
-
-    # ไม่ว่าจะสำเร็จหรือไม่ ก็กลับไปที่หน้าห้องเรียนเดิม
-    return redirect('room:teacher_detail', pk=announcement.room.pk)
 
 @login_required
 def create_assignment(request, room_id):
@@ -295,8 +376,8 @@ def teacher_assignment_detail(request, pk):
     # 4. ตัวแปรเก็บสถิติ (เริ่มต้นเป็น 0)
     stats = {
         'total': students_in_room.count(), # จำนวนนักเรียนทั้งหมด
-        'submitted': 0, # ส่งแล้ว
-        'pending': 0,   # รอตรวจ
+        'submitted': 0, # ส่งแล้ว (รวมทุกสถานะที่ส่งมา)
+        'pending': 0,   # รอตรวจ (รอ AI หรือ รอครูอนุมัติ)
         'passed': 0,    # ผ่านแล้ว
         'reported': 0   # แจ้งปัญหา
     }
@@ -308,40 +389,47 @@ def teacher_assignment_detail(request, pk):
         # ดึงงานส่งของนักเรียนคนนี้ (ถ้ามี)
         submission = submission_map.get(student.user.id)
         
-        display_status = 'MISSING' # ค่าเริ่มต้น
+        display_status = 'MISSING' # ค่าเริ่มต้น (ยังไม่ส่ง)
         
         if submission:
             # ✅ ถ้านักเรียนคนนี้มีงานส่ง -> นับ +1 ทันที
             stats['submitted'] += 1
             
-            # เช็คสถานะย่อย
+            # --- เช็คสถานะย่อย ---
+            
+            # 1. กรณีมีการแจ้งปัญหา (Report)
             if submission.is_reported:
                 display_status = 'REPORTED'
                 stats['reported'] += 1
-                # (เคสแจ้งปัญหา ถือว่าส่งแล้ว แต่อาจจะไม่นับเป็น pending หรือ passed แล้วแต่คุณ)
+                stats['pending'] += 1 # ถือว่าต้องรอครูเข้าไปดู
                 
+            # 2. กรณีผ่านแล้ว (Approved)
             elif submission.status == 'PASSED':
                 display_status = 'PASSED'
                 stats['passed'] += 1
                 
+            # 3. กรณีถูกส่งคืน (Reject/Revision)
             elif submission.status == 'REJECT':
                 display_status = 'REJECT'
-                # (เคสโดนตีกลับ ก็ถือว่าส่งแล้ว -> submitted +1 แต่ยังไม่ passed)
+                # ไม่นับเป็น pending หรือ passed เพราะถือว่าส่งกลับไปแล้ว
                 
-            elif submission.ai_feedback or submission.is_graded:
+            # 4. กรณี AI ตรวจแล้ว (รอครูอนุมัติ)
+            elif submission.status == 'GRADED': # <--- แก้ตรงนี้ (ใช้ status แทน is_graded)
                 display_status = 'WAITING_APPROVAL'
                 stats['pending'] += 1
                 
-            else:
+            # 5. กรณีเพิ่งส่ง (รอ AI ตรวจ)
+            else: # status == 'PENDING'
                 display_status = 'SUBMITTED'
                 stats['pending'] += 1 # รอ AI ตรวจ ก็ถือว่า Pending
         
-        # เก็บข้อมูลใส่ List
+        # เก็บข้อมูลเพื่อนำไปแสดงผลในตาราง
         student_submissions.append({
             'student': student,
             'submission': submission,
-            'display_status': display_status
+            'status': display_status
         })
+        
 
     # เรียงลำดับ: แจ้งปัญหา > รอตรวจ > ส่งแล้ว > ผ่านแล้ว > ยังไม่ส่ง
     status_priority = {
@@ -352,7 +440,7 @@ def teacher_assignment_detail(request, pk):
         'PASSED': 5,
         'MISSING': 6
     }
-    student_submissions.sort(key=lambda x: status_priority.get(x['display_status'], 99))
+    student_submissions.sort(key=lambda x: status_priority.get(x['status'], 99))
 
     context = {
         'assignment': assignment,
@@ -374,32 +462,59 @@ def teacher_assignment_detail(request, pk):
 
 class AssignmentDeleteView(LoginRequiredMixin, DeleteView):
     model = Assignment
-    # Template fallback (กรณีเข้า URL ตรงๆ), แต่หลักๆ เราจะใช้ Modal
-    template_name = 'teacher/assignment_confirm_delete.html' 
+    # template_name = 'teacher/assignment_confirm_delete.html' # ถ้าใช้ Modal กด Submit มาเลย บรรทัดนี้อาจไม่ได้ใช้ แต่ใส่กันไว้ก่อนได้ครับ
     
     def get_queryset(self):
         """
-        แก้ไข: กรองให้ลบได้เฉพาะ Assignment ที่ตัวเองเป็นคนสร้าง (author) เท่านั้น
+        แก้ไข: กรองให้ลบได้เฉพาะ
+        1. คนสร้าง (author)
+        2. หรือ เจ้าของห้อง (room.owner)
         """
         queryset = super().get_queryset()
-        return queryset.filter(author=self.request.user)
+        user = self.request.user
+
+        # ใช้ Q Object เพื่อสร้างเงื่อนไข "หรือ" (OR)
+        # ความหมาย: เอา Assignment ที่ (author คือ user) หรือ (room__owner คือ user)
+        return queryset.filter(Q(author=user) | Q(room__owner=user))
 
     def get_success_url(self):
         """
         หลังจากลบสำเร็จ ให้ redirect กลับไปที่หน้ารายละเอียดของ 'ห้องเรียน'
-        ที่ Assignment นี้เคยอยู่
         """
-        # self.object คือ assignment ที่เพิ่งถูกลบไป
         room_pk = self.object.room.pk
         return reverse('room:teacher_detail', kwargs={'pk': room_pk})
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Override เมธอด delete เพื่อเพิ่ม Flash Message แจ้งเตือนก่อนลบจริง
+        """
+        obj = self.get_object() # ดึงข้อมูลงานที่จะลบมาเก็บไว้ก่อน (เดี๋ยวลบแล้วจะหาชื่อไม่เจอ)
+        
+        messages.success(request, f"ลบงาน '{obj.title}' เรียบร้อยแล้ว")
+        
+        return super().delete(request, *args, **kwargs)
 
 @login_required
 def edit_assignment(request, pk):
     assignment = get_object_or_404(Assignment, pk=pk)
 
-    if assignment.author != request.user:
-        messages.error(request, "คุณไม่มีสิทธิ์แก้ไขงานชิ้นนี้ เนื่องจากไม่ใช่ผู้สร้าง")
+    # ============================================================
+    # 🔑 UPDATE PERMISSION: ให้เจ้าของห้องแก้ได้ด้วย
+    # ============================================================
+    
+    # 1. เช็คว่าเป็นคนสร้างหรือไม่?
+    is_author = (assignment.author == request.user)
+    
+    # 2. เช็คว่าเป็นเจ้าของห้องใหญ่หรือไม่? (เข้าถึงผ่าน assignment.room)
+    # หมายเหตุ: ถ้าโมเดลคุณชื่ออื่น (เช่น assignment.classroom) ให้แก้ตรงนี้
+    is_room_owner = (assignment.room.owner == request.user)
+
+    # ถ้า "ไม่ใช่คนสร้าง" และ "ไม่ใช่เจ้าของห้อง" -> ดีดออก
+    if not is_author and not is_room_owner:
+        messages.error(request, "คุณไม่มีสิทธิ์แก้ไขงานชิ้นนี้ (สงวนสิทธิ์เฉพาะผู้สร้าง หรือเจ้าของห้อง)")
         return redirect('teacher:assignment_detail', pk=assignment.pk)
+
+    # ============================================================
 
     if request.method == 'POST':
         # ✅ ถูกต้อง: มี request.FILES
@@ -440,47 +555,129 @@ def edit_assignment(request, pk):
     }
     return render(request, 'teacher/edit_assignment.html', context)
 
-
 @login_required
 def review_submission_view(request, pk):
-    # 1. ดึงข้อมูลงานส่ง (Submission)
+    # 1. ดึงข้อมูลงานส่ง
     submission = get_object_or_404(Submission, pk=pk)
     
-    # 2. เช็คสิทธิ์: คนดูต้องเป็นเจ้าของห้อง หรือครูผู้ช่วย
+    # 2. เช็คสิทธิ์ (อาจารย์เจ้าของวิชา หรือ TA)
     assignment = submission.assignment
-    if assignment.room.owner != request.user and not assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists():
-        # ถ้าไม่มีสิทธิ์ ดีดกลับไป Dashboard
+    is_owner = assignment.room.owner == request.user
+    is_ta = hasattr(request.user, 'teacher_profile') and assignment.room.teachers.filter(pk=request.user.teacher_profile.pk).exists()
+    
+    if not is_owner and not is_ta:
+        messages.error(request, "คุณไม่มีสิทธิ์ตรวจงานนี้")
         return redirect('teacher:dashboard')
+
+    # ✅ STEP 1: ดึง Quiz แบบปลอดภัย (Safe Fetch)
+    quiz_instance = None
+    current_quiz_score = 0
+    
+    try:
+        if hasattr(submission, 'quiz'): 
+            quiz_instance = submission.quiz
+            current_quiz_score = quiz_instance.score
+    except (ObjectDoesNotExist, Exception) as e:
+        print(f"Quiz access error: {e}")
+        quiz_instance = None
+        current_quiz_score = 0
 
     # 3. Logic การตรวจงาน (POST)
     if request.method == 'POST':
-        action = request.POST.get('action')
-        comment = request.POST.get('teacher_comment', '')
-        ai_score = request.POST.get('ai_score')
-
-        submission.teacher_comment = comment
-        if ai_score:
-            submission.ai_score = int(ai_score)
+        form = GradingForm(request.POST)
         
-        submission.graded_at = timezone.now()
-        
-        if action == 'approve':
-            submission.status = 'PASSED'
-            submission.is_reported = False
-        elif action == 'reject':
-            submission.status = 'REJECT'
-            submission.is_reported = False
+        if form.is_valid():
+            action = request.POST.get('action')
             
-        submission.save()
-        # บันทึกเสร็จ กลับไปหน้ารายชื่อนักเรียน
-        return redirect('teacher:assignment_detail', pk=assignment.pk)
+            # --- ดึงข้อมูลจาก Form ---
+            new_ai_score = form.cleaned_data['score']
+            new_comment = form.cleaned_data['feedback']
+            new_quiz_score = form.cleaned_data.get('quiz_score')
 
-    # 4. ดึงข้อมูล Quiz (ถ้ามี)
-    quiz = getattr(submission, 'quiz', None)
+            # --- อัปเดตข้อมูล Submission พื้นฐาน ---
+            submission.teacher_comment = new_comment
+            submission.ai_score = new_ai_score
+            submission.graded_at = timezone.now()
+            submission.is_graded = True # เก็บไว้เผื่อใช้ logic เดิมร่วมด้วย
+            
+            # --- ✅ STEP 2: อัปเดต Quiz เฉพาะตอนที่มี Quiz อยู่จริงเท่านั้น ---
+            if quiz_instance and new_quiz_score is not None:
+                quiz_instance.score = new_quiz_score
+                quiz_instance.save()
+                current_quiz_score = new_quiz_score
+
+            # --- คำนวณคะแนนรวม (AI + Quiz) ---
+            ai_part = submission.ai_score if submission.ai_score else 0
+            submission.score = ai_part + current_quiz_score
+
+            # ========================================================
+            # ✅ CASE 1: อนุมัติ (APPROVE) -> สถานะเปลี่ยนเป็น APPROVED
+            # ========================================================
+            if action == 'approve':
+                # UPDATE: ใช้ APPROVED ตาม model ใหม่ (เพื่อให้ปุ่มทำ Quiz ขึ้นฝั่งนักเรียน)
+                submission.status = 'APPROVED' 
+                
+                # --- ลบ Quiz เก่าทิ้งเพื่อให้สร้างใหม่ (Safe Delete) ---
+                # เพราะถ้านักเรียนเคยทำแล้วแต่ครูให้ผ่านใหม่ นักเรียนควรได้ทำ Quiz ใหม่หรือใช้ตัวเดิม
+                if quiz_instance:
+                    try:
+                        quiz_instance.delete()
+                        quiz_instance = None
+                        current_quiz_score = 0 
+                    except Exception as e:
+                        print(f"Error deleting quiz: {e}")
+
+                # รีเซ็ต flag เพื่อให้ระบบรู้ว่ายังไม่มี Quiz (ปุ่ม 'เริ่มทำแบบทดสอบ' จะโผล่)
+                submission.quiz_generated = False 
+                
+                submission.save() 
+                messages.success(request, "อนุมัติงานเรียบร้อย (นักเรียนสามารถเริ่มทำ Quiz ได้แล้ว)")
+
+            # ========================================================
+            # ❌ CASE 2: ส่งคืน (REJECT) -> สถานะเปลี่ยนเป็น REJECTED
+            # ========================================================
+            elif action == 'reject':
+                # UPDATE: ใช้ REJECTED ตาม model ใหม่
+                submission.status = 'REJECTED'
+                submission.is_graded = False 
+                
+                # --- ลบ Quiz ทิ้ง (ถ้ามี) เพราะงานไม่ผ่าน ---
+                submission.quiz_generated = False
+                if quiz_instance:
+                    try:
+                        quiz_instance.delete()
+                    except:
+                        pass
+                
+                submission.save()
+                messages.warning(request, "ส่งคืนงานเรียบร้อย (แจ้งเตือนให้นักเรียนแก้ไข)")
+
+            # ========================================================
+            # 💾 CASE 3: บันทึกเฉยๆ (Save Draft / Update Score)
+            # ========================================================
+            else:
+                # ถ้าสถานะเดิมคือ PENDING ให้เปลี่ยนเป็น GRADED (AI ตรวจแล้ว/ครูตรวจแล้ว)
+                if submission.status == 'PENDING':
+                    submission.status = 'GRADED'
+                
+                submission.save()
+                messages.success(request, "บันทึกข้อมูลเรียบร้อย")
+            
+            return redirect('teacher:assignment_detail', pk=assignment.pk)
+
+    # 4. กรณี GET (เปิดหน้าตรวจงาน)
+    else:
+        initial_data = {
+            'score': submission.ai_score,
+            'quiz_score': current_quiz_score,
+            'feedback': submission.teacher_comment
+        }
+        form = GradingForm(initial=initial_data)
 
     return render(request, 'teacher/review_submission.html', {
         'submission': submission,
-        'quiz': quiz
+        'form': form,
+        'quiz': quiz_instance
     })
 
 @login_required

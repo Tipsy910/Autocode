@@ -4,30 +4,100 @@ import mimetypes
 import requests
 import google.generativeai as genai
 from django.conf import settings
-from dotenv import load_dotenv
 import re
 from google.api_core import retry
 from .ai_schemas import AiMultiFeedback, QuizSchema
+import ast
+from room.utils import get_active_model
+
+
 try:
     from markdown import markdown as md_to_html
 except Exception:
     md_to_html = None
 
+def check_colab_link_accessibility(url):
+    """
+    ฟังก์ชันช่วยเช็ค:
+    1. รูปแบบ URL ถูกต้อง
+    2. Domain คือ colab.research.google.com เป๊ะๆ
+    3. ลิงก์เปิดได้จริง (Public) ไม่ติด Login
+    """
+    # 1. เช็ค Domain แบบเข้มงวด
+    try:
+        parsed = urlparse(url)
+        # ตรวจว่าต้องเป็น https และ domain ต้องเป๊ะ
+        if parsed.scheme != "https" or parsed.netloc != "colab.research.google.com":
+            return False, "ลิงก์ต้องขึ้นต้นด้วย https://colab.research.google.com/ เท่านั้น"
+    except Exception:
+        return False, "รูปแบบ URL ไม่ถูกต้อง"
 
-load_dotenv()
-# --- 3. ตั้งค่า API KEY ---
-api_key = os.getenv("GOOGLE_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
-else:
-    print("❌ (CONFIG) ไม่พบ GOOGLE_API_KEY")
+    # 2. ยิง Request ไปเช็คว่าลิงก์เปิดได้ไหม (Ping)
+    try:
+        # ใส่ User-Agent เพื่อไม่ให้ Google บล็อกว่าเราเป็นบอท
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        
+        # timeout=5 คือถ้าเกิน 5 วิให้ตัดจบ (กันเว็บค้าง)
+        response = requests.get(url, headers=headers, timeout=5)
 
-# --- 4. สร้าง Model และ Function เรียก AI (แบบ Structured) ---
-try:
-    model = genai.GenerativeModel('gemini-2.5-flash')
-except Exception as e:
-    print(f"🚨 (CONFIG) ไม่สามารถโหลด Gemini Model: {e}")
-    model = None # ตั้งค่าเป็น None ถ้าโหลดไม่สำเร็จ
+        # ถ้า Google Redirect ไปหน้า Login (accounts.google.com) แสดงว่าไม่ได้เปิดแชร์
+        if "accounts.google.com" in response.url or "signin" in response.url:
+            return False, "ลิงก์นี้เป็นส่วนตัว (Private) กรุณาเปิดแชร์เป็น 'Anyone with the link' (ทุกคนที่มีลิงก์)"
+        
+        # ถ้า Response ไม่ใช่ 200 OK
+        if response.status_code != 200:
+            return False, f"ไม่สามารถเข้าถึงลิงก์ได้ (Status: {response.status_code})"
+            
+    except requests.exceptions.RequestException:
+        return False, "ไม่สามารถเชื่อมต่อกับลิงก์ได้ (ลิงก์อาจเสียหรือหมดอายุ)"
+
+    return True, ""
+
+
+def validate_file_content(uploaded_file):
+    """
+    ฟังก์ชันเปิดอ่านเนื้อหาไฟล์เพื่อเช็คว่าเป็น .py หรือ .ipynb ของจริงหรือไม่
+    """
+    filename = uploaded_file.name.lower()
+    
+    try:
+        # อ่านไฟล์ทั้งหมดขึ้นมาใน Memory เพื่อตรวจสอบ
+        content = uploaded_file.read()
+        
+        # ⚠️ สำคัญมาก: อ่านเสร็จต้องเลื่อน cursor กลับไปที่จุดเริ่มต้น (0) 
+        # ไม่งั้นตอน save ลง database ไฟล์จะกลายเป็นไฟล์เปล่า
+        uploaded_file.seek(0)
+        
+        # --- กรณีเป็น .ipynb (ต้องเป็น JSON และมีคีย์ 'cells') ---
+        if filename.endswith('.ipynb'):
+            try:
+                # ลองแปลง bytes เป็น string แล้วโหลด JSON
+                data = json.loads(content.decode('utf-8'))
+                
+                # เช็คโครงสร้างพื้นฐานของ Notebook
+                if 'cells' not in data or 'metadata' not in data:
+                    return False, "ไฟล์ .ipynb เสียหาย หรือโครงสร้างไม่ถูกต้อง"
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return False, "ไม่ใช่ไฟล์ Jupyter Notebook ที่ถูกต้อง (อาจเป็นไฟล์อื่นเปลี่ยนนามสกุลมา)"
+
+        # --- กรณีเป็น .py (ต้องเป็น Text ที่ Compile เป็น Python ได้) ---
+        elif filename.endswith('.py'):
+            try:
+                source_code = content.decode('utf-8')
+                # ลอง parse ดูว่าเป็น Python Syntax หรือไม่
+                ast.parse(source_code)
+            except UnicodeDecodeError:
+                return False, "ไฟล์นี้ไม่ใช่ Text File (อาจเป็น Binary/Image เปลี่ยนชื่อมา)"
+            except SyntaxError:
+                # ถ้า Parse ไม่ผ่าน แปลว่า Syntax ผิด แต่ก็ยังถือว่าเป็น Text File ได้ 
+                # แต่ถ้าจะเอาชัวร์ว่าส่งโค้ดรันได้ ให้ return False ตรงนี้ได้เลย
+                # ในที่นี้ขออนุญาตปล่อยผ่านกรณี Syntax Error (เผื่อเด็กเขียนโค้ดผิดแต่ส่งไฟล์ถูกประเภท)
+                pass 
+                
+    except Exception as e:
+        return False, f"เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}"
+
+    return True, ""
 
 def extract_code_from_colab(colab_url):
     """
@@ -68,11 +138,17 @@ def extract_code_from_colab(colab_url):
 def call_gemini_structured(prompt_parts_list, pydantic_schema_class):
     """
     เรียก Gemini API (Multimodal) ในโหมด Structured Output
+    ✅ อัปเดต: เรียก get_active_model() ภายในฟังก์ชัน เพื่อให้ได้ Config ล่าสุดเสมอ
     """
     print("\n--- ⏳ กำลังส่งคำสั่ง (Multimodal/Structured) ให้ Gemini ---")
     
+    # -----------------------------------------------------------------
+    # ✅ 1. เรียก Model ล่าสุดจาก Database ที่นี่ (แทน Global Variable)
+    # -----------------------------------------------------------------
+    model = get_active_model()
+
     if model is None:
-        print("🚨 (CALL_GEMINI) Model ไม่ได้ถูกโหลด")
+        print("🚨 (CALL_GEMINI) ไม่สามารถโหลด Model ได้ (ตรวจสอบ Admin Config)")
         return None
         
     try:
@@ -82,15 +158,13 @@ def call_gemini_structured(prompt_parts_list, pydantic_schema_class):
         )
         
         # -----------------------------------------------------------------
-        #  ✅ นี่คือการแก้ไขที่สำคัญที่สุด ✅
-        #  เราเปลี่ยน 'prompt_text' (ที่ผิด) เป็น 'contents' (ที่ถูก)
+        # ✅ 2. สั่ง Generate (ใช้ 'contents' ตามที่คุณแก้ไขมาถูกต้องแล้ว)
         # -----------------------------------------------------------------
         response = model.generate_content(
-            contents=prompt_parts_list, # 👈 ⭐️ ใช้ 'contents' ⭐️
+            contents=prompt_parts_list, 
             generation_config=generation_config,
-            request_options={'retry': retry.Retry(deadline=120)} # (เพิ่ม retry เข้ามาในนี้เลย)
+            request_options={'retry': retry.Retry(deadline=120)} 
         )
-        # -----------------------------------------------------------------
         
         print("✅ Gemini ตอบกลับ (Multimodal/Structured) สำเร็จ")
         return response.text

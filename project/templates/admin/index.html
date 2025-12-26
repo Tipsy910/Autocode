@@ -1,0 +1,70 @@
+{% extends "admin/index.html" %}
+{% load dashboard_stats %} {% block content %}
+    {% get_summary_stats as stats %}
+
+    <div class="row" style="margin-bottom: 20px;">
+        
+        <div class="col-lg-3 col-6">
+            <div class="small-box bg-info">
+                <div class="inner">
+                    <h3>{{ stats.students }}</h3>
+                    <p>นักเรียนทั้งหมด (Students)</p>
+                </div>
+                <div class="icon">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
+                <a href="/admin/users/students/" class="small-box-footer">
+                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-6">
+            <div class="small-box bg-success">
+                <div class="inner">
+                    <h3>{{ stats.teachers }}</h3>
+                    <p>อาจารย์ (Teachers)</p>
+                </div>
+                <div class="icon">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                </div>
+                <a href="/admin/users/teachers/" class="small-box-footer">
+                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-6">
+            <div class="small-box bg-warning">
+                <div class="inner">
+                    <h3>{{ stats.rooms }}</h3>
+                    <p>ห้องเรียน (Active Rooms)</p>
+                </div>
+                <div class="icon">
+                    <i class="fas fa-school"></i>
+                </div>
+                <a href="/admin/room/room/" class="small-box-footer">
+                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-6">
+            <div class="small-box bg-danger">
+                <div class="inner">
+                    <h3>{{ stats.assignments }}</h3>
+                    <p>งานทั้งหมด (Assignments)</p>
+                </div>
+                <div class="icon">
+                    <i class="fas fa-book"></i>
+                </div>
+                <a href="/admin/room/assignment/" class="small-box-footer">
+                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    {{ block.super }}
+{% endblock %}

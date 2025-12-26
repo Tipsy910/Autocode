@@ -60,6 +60,7 @@ class Assignment(models.Model):
     description = models.TextField(blank=True, null=True)
     due_date = models.DateTimeField(blank=True, null=True)
     score = models.FloatField(blank=True, null=True)
+    allow_late_submission = models.BooleanField(default=False, verbose_name="อนุญาตให้ส่งเกินเวลา")
 
     # --- ส่วนตั้งค่าสำหรับ AI Quiz Generation ---
     test_case_file = models.FileField(
@@ -99,8 +100,14 @@ class Assignment(models.Model):
     null=True,
     related_name='created_assignments')
 
-
+    
     created_at = models.DateTimeField(auto_now_add=True)
+
+    quiz_time_limit = models.PositiveIntegerField(
+        default=10, 
+        verbose_name="เวลาทำแบบทดสอบ (นาที)",
+        help_text="ระบุเวลาเป็นนาที (เช่น 15)"
+    )
 
     def __str__(self):
         return self.title
@@ -144,10 +151,11 @@ class Submission(models.Model):
     
     # สถานะของงาน
     STATUS_CHOICES = [
-        ('PENDING', 'รอส่ง/รอตรวจ'),
-        ('GRADED', 'AI ตรวจแล้ว (รออนุมัติ)'),
-        ('PASSED', 'ผ่านแล้ว (Approved)'),
-        ('REJECT', 'ส่งคืนให้แก้ไข (Revision)'),
+        ('PENDING', 'รอ AI ตรวจสอบ'),           # 1. ส่งงานแล้ว
+        ('GRADED', 'AI ตรวจแล้ว (รอครูอนุมัติ)'),  # 2. AI ตรวจแล้ว
+        ('APPROVED', 'ผ่านแล้ว (ทำ Quiz ได้)'),   # 3-4. ครูอนุมัติแล้ว
+        ('COMPLETED', 'เสร็จสมบูรณ์'),           # 5. ทำ Quiz เสร็จแล้ว
+        ('REJECTED', 'ถูกตีกลับ (แก้ไขงาน)'),     # 6. ไม่ผ่าน
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     
@@ -172,7 +180,7 @@ class SubmissionFile(models.Model):
     def __str__(self):
         return f"File for submission {self.submission.id} ({self.file.name})"
 
-# --- โมเดลสำหรับควิซที่ AI สร้างขึ้นมาโดยเฉพาะ ---
+
 class Announcement(models.Model):
     """
     โมเดลสำหรับเก็บประกาศ 1 ชิ้น
@@ -191,7 +199,7 @@ class Announcement(models.Model):
         ordering = ['-created_at'] # เรียงจากใหม่สุดไปเก่าสุดเสมอ
 
     def __str__(self):
-        return f"Announcement in {self.room.name} by {self.author.email}"
+        return f"Announcement in {self.room.name}"
 
 class AnnouncementFile(models.Model):
     """
@@ -219,12 +227,15 @@ class Quiz(models.Model):
     # วันที่สร้างควิซ
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # เก็บเวลาที่นักเรียนเริ่มกดทำ
+    started_at = models.DateTimeField(null=True, blank=True)
+
     # คะแนนที่ทำได้จริง (เช่น สอบได้ 4)
     score = models.IntegerField(default=0, help_text="คะแนนที่นักเรียนทำได้")
     
     # คะแนนเต็ม/จำนวนข้อทั้งหมด (เช่น เต็ม 5) -> สำคัญมาก เอาไว้คำนวณเกรด
     total_questions = models.IntegerField(default=0, help_text="จำนวนข้อสอบทั้งหมดในชุดนี้")
-    
+
     # สถานะว่าทำเสร็จหรือยัง (True = ส่งกระดาษคำตอบแล้ว)
     is_completed = models.BooleanField(default=False)
 
@@ -277,3 +288,37 @@ class QuizAnswer(models.Model):
 
     def __str__(self):
         return f"Ans: {self.selected_choice} for {self.question}"
+
+
+# ✅ 1. ตารางเก็บรายชื่อโมเดล (เช่น Gemini Pro, GPT-4o)
+class AIModelOption(models.Model):
+    name = models.CharField(max_length=100, help_text="ชื่อที่แสดงให้เห็น (เช่น Gemini 1.5 Pro)")
+    api_value = models.CharField(max_length=100, help_text="ค่าที่ส่งไป API (เช่น gemini-1.5-pro)")
+    is_active = models.BooleanField(default=True, help_text="เปิดให้เลือกใช้หรือไม่")
+
+
+    def __str__(self):
+        return f"{self.name} ({self.api_value})"
+
+# ✅ 2. ตารางตั้งค่า (แก้จากอันเดิม)
+class AIConfiguration(models.Model):
+    is_active = models.BooleanField(default=True, help_text="เปิด/ปิด ระบบ AI ทั้งหมด")
+    api_key = models.CharField(max_length=255, help_text="Google Generative AI API Key")
+    
+    # เปลี่ยนจาก choices เป็นเก็บค่า string ธรรมดา (แต่เราจะบังคับให้เลือกผ่าน Form)
+    current_model = models.ForeignKey(
+        AIModelOption, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="เลือกโมเดลที่จะใช้งานปัจจุบัน"
+    )
+    
+    last_status_ok = models.BooleanField(default=False, verbose_name="สถานะล่าสุด")
+    last_checked_at = models.DateTimeField(null=True, blank=True, verbose_name="ตรวจสอบเมื่อ")
+    
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        model_name = self.current_model.name if self.current_model else "ยังไม่เลือกโมเดล"
+        return f"AI Config - {self.current_model.name}"

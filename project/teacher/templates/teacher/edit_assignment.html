@@ -7,103 +7,166 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
+                
                 <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">แก้ไขงาน: {{ assignment.title }}</h3>
+                    <h3 class="mb-0"><i class="fas fa-edit me-2"></i>แก้ไขงาน: {{ assignment.title }}</h3>
                 </div>
+                
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" action="">
+                    <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
 
                         {% if form.non_field_errors %}
-                            <div class="alert alert-danger">
-                                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
-                            </div>
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                        </div>
                         {% endif %}
 
                         <div class="mb-3">
-                            <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}</label>
-                            <input type="text" name="{{ form.title.name }}" value="{{ form.title.value|default:'' }}" class="form-control {% if form.title.errors %}is-invalid{% endif %}" id="{{ form.title.id_for_label }}">
+                            <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">{{ form.title.label }}</label>
+                            {{ form.title }}
                             <div class="invalid-feedback">{{ form.title.errors|striptags }}</div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
-                            <textarea name="{{ form.description.name }}" class="form-control" rows="4" id="{{ form.description.id_for_label }}">{{ form.description.value|default:'' }}</textarea>
+                            <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">{{ form.description.label }}</label>
+                            {{ form.description }}
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="{{ form.problem_file.id_for_label }}" class="form-label">
-                                <i class="fas fa-file-pdf text-danger"></i> ไฟล์โจทย์ (PDF, PNG, JPG) (ถ้ามี)
+                            <label for="{{ form.problem_file.id_for_label }}" class="form-label fw-bold">
+                                <i class="fas fa-file-pdf text-danger"></i> {{ form.problem_file.label }} (ถ้ามี)
                             </label>
                             
-                            <div class="mb-2">
-                                {{ form.problem_file }}
+                            {% if form.instance.problem_file %}
+                            <div class="mb-2 p-2 bg-light border rounded">
+                                <small class="text-muted">
+                                    <i class="fas fa-paperclip me-1"></i>ไฟล์ปัจจุบัน: 
+                                    <a href="{{ form.instance.problem_file.url }}" target="_blank" class="fw-bold text-decoration-none">
+                                        {{ form.instance.problem_file.name }}
+                                    </a>
+                                </small>
                             </div>
-
-                            {% if form.problem_file.errors %}
-                                <div class="text-danger small mt-1">{{ form.problem_file.errors|striptags }}</div>
                             {% endif %}
-                            <div class="form-text">{{ form.problem_file.help_text }}</div>
+                            
+                            {{ form.problem_file }}
+                            {% if form.problem_file.errors %}
+                            <div class="alert alert-danger p-1 small mt-1">{{ form.problem_file.errors }}</div>
+                            {% endif %}
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.due_date.id_for_label }}" class="form-label">{{ form.due_date.label }}</label>
-                                <input type="datetime-local" name="{{ form.due_date.name }}" value="{{ form.due_date.value|date:'Y-m-d\TH:i' }}" class="form-control {% if form.due_date.errors %}is-invalid{% endif %}" id="{{ form.due_date.id_for_label }}">
-                                <div class="invalid-feedback">{{ form.due_date.errors|striptags }}</div>
+                                <label for="{{ form.due_date.id_for_label }}" class="form-label fw-bold">{{ form.due_date.label }}</label>
+                                {{ form.due_date }}
                             </div>
+
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.score.id_for_label }}" class="form-label">{{ form.score.label }}</label>
-                                <input type="number" name="{{ form.score.name }}" value="{{ form.score.value|default:'' }}" class="form-control {% if form.score.errors %}is-invalid{% endif %}" id="{{ form.score.id_for_label }}" min="0">
-                                <div class="invalid-feedback">{{ form.score.errors|striptags }}</div>
+                                <label for="{{ form.score.id_for_label }}" class="form-label fw-bold">{{ form.score.label }}</label>
+                                {{ form.score }}
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">{{ form.allowed_submission_types.label }}</label>
-                            {% if form.allowed_submission_types.errors %}<div class="alert alert-danger py-1">{{ form.allowed_submission_types.errors|striptags }}</div>{% endif %}
+                            <div class="p-3 border rounded bg-light d-flex align-items-center">
+                                <div class="form-check form-switch mb-0">
+                                    {{ form.allow_late_submission }}
+                                    <label class="form-check-label fw-bold ms-2" for="{{ form.allow_late_submission.id_for_label }}">
+                                        {{ form.allow_late_submission.label }}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-text mt-1 text-muted">
+                                <i class="fas fa-info-circle"></i> {{ form.allow_late_submission.help_text }}
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">{{ form.allowed_submission_types.label }}</label>
                             <div class="border rounded p-2">
                                 {% for checkbox in form.allowed_submission_types %}
                                 <div class="form-check">
                                     {{ checkbox.tag }}
-                                    <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                                    <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                        {{ checkbox.choice_label }}
+                                    </label>
                                 </div>
                                 {% endfor %}
                             </div>
                             <div class="form-text">{{ form.allowed_submission_types.help_text }}</div>
                         </div>
-                        
-                        <hr>
-                        
-                        <h5 class="mb-3">ตั้งค่าสำหรับ AI Quiz Generation</h5>
 
                         <div class="mb-3">
-                            <label for="{{ form.test_case_file.id_for_label }}" class="form-label">{{ form.test_case_file.label }}</label>
-                            {{ form.test_case_file }}
-                            {% if form.test_case_file.errors %}
-                                <div class="text-danger small mt-1">{{ form.test_case_file.errors|striptags }}</div>
+                            <label for="{{ form.test_case_file.id_for_label }}" class="form-label fw-bold">{{ form.test_case_file.label }}</label>
+                            
+                            {% if form.instance.test_case_file %}
+                            <div class="mb-2 p-2 bg-light border rounded">
+                                <small class="text-muted">
+                                    <i class="fas fa-code me-1"></i>ไฟล์ Test Case ปัจจุบัน: 
+                                    <a href="{{ form.instance.test_case_file.url }}" target="_blank" class="fw-bold text-decoration-none">
+                                        {{ form.instance.test_case_file.name }}
+                                    </a>
+                                </small>
+                            </div>
                             {% endif %}
+                            
+                            {{ form.test_case_file }}
                             <div class="form-text">{{ form.test_case_file.help_text }}</div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.quiz_question_count.id_for_label }}" class="form-label">{{ form.quiz_question_count.label }}</label>
-                                <input type="number" name="{{ form.quiz_question_count.name }}" value="{{ form.quiz_question_count.value|default:'' }}" class="form-control {% if form.quiz_question_count.errors %}is-invalid{% endif %}" id="{{ form.quiz_question_count.id_for_label }}" min="1">
-                                <div class="invalid-feedback">{{ form.quiz_question_count.errors|striptags }}</div>
-                                <div class="form-text">{{ form.quiz_question_count.help_text }}</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.quiz_choice_count.id_for_label }}" class="form-label">{{ form.quiz_choice_count.label }}</label>
-                                <input type="number" name="{{ form.quiz_choice_count.name }}" value="{{ form.quiz_choice_count.value|default:'' }}" class="form-control {% if form.quiz_choice_count.errors %}is-invalid{% endif %}" id="{{ form.quiz_choice_count.id_for_label }}" min="2">
-                                <div class="invalid-feedback">{{ form.quiz_choice_count.errors|striptags }}</div>
-                                <div class="form-text">{{ form.quiz_choice_count.help_text }}</div>
+                        <hr class="my-4">
+
+                        <div class="mb-3">
+                            <div class="p-3 border border-warning rounded bg-white">
+                                <div class="form-check form-switch">
+                                    {{ form.enable_ai_quiz }}
+                                    <label class="form-check-label fw-bold ms-2 text-warning" for="{{ form.enable_ai_quiz.id_for_label }}">
+                                        <i class="fas fa-magic me-1"></i> อนุญาตให้นักเรียนสร้าง AI Quiz
+                                    </label>
+                                </div>
+                                <div class="form-text ms-4 mt-2">
+                                    <small>หากเปิด: นักเรียนสามารถกดให้ AI สร้างแบบทดสอบได้ <br>
+                                    หากปิด: นักเรียนจะส่งงานได้อย่างเดียว</small>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}" class="btn btn-secondary me-md-2">ยกเลิก</a>
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>บันทึกการเปลี่ยนแปลง</button>
+                        <div id="quiz-settings-area" style="display: none;">
+                            <div class="card card-body bg-light border-0 mb-3">
+                                <h5 class="mb-3 text-primary"><i class="fas fa-cogs me-2"></i>ตั้งค่า AI Quiz Generation</h5>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.quiz_question_count.id_for_label }}" class="form-label">{{ form.quiz_question_count.label }}</label>
+                                        {{ form.quiz_question_count }}
+                                        <div class="form-text">{{ form.quiz_question_count.help_text }}</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.quiz_choice_count.id_for_label }}" class="form-label">{{ form.quiz_choice_count.label }}</label>
+                                        {{ form.quiz_choice_count }}
+                                        <div class="form-text">{{ form.quiz_choice_count.help_text }}</div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="{{ form.quiz_time_limit.id_for_label }}" class="form-label fw-bold">
+                                        <i class="fas fa-clock me-1"></i> {{ form.quiz_time_limit.label }}
+                                    </label>
+                                    {{ form.quiz_time_limit }}
+                                    <div class="form-text">{{ form.quiz_time_limit.help_text }}</div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+                            <a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}" class="btn btn-secondary px-4">
+                                ยกเลิก
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="fas fa-save me-2"></i>บันทึกการเปลี่ยนแปลง
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -111,4 +174,32 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const toggleSwitch = document.getElementById('{{ form.enable_ai_quiz.id_for_label }}');
+        const settingsArea = document.getElementById('quiz-settings-area');
+
+        function toggleSettings() {
+            if (toggleSwitch && settingsArea) {
+                if (toggleSwitch.checked) {
+                    settingsArea.style.display = 'block';
+                    // Animation
+                    settingsArea.style.opacity = 0;
+                    setTimeout(() => { 
+                        settingsArea.style.opacity = 1; 
+                        settingsArea.style.transition = 'opacity 0.3s'; 
+                    }, 10);
+                } else {
+                    settingsArea.style.display = 'none';
+                }
+            }
+        }
+
+        if (toggleSwitch) {
+            toggleSettings(); // เช็คค่าเริ่มต้น (เผื่อแก้ไขงานแล้วเคยเปิดไว้)
+            toggleSwitch.addEventListener('change', toggleSettings);
+        }
+    });
+</script>
 {% endblock %}

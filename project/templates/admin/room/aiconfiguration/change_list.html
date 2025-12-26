@@ -1,0 +1,54 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{# แทรกเนื้อหาเหนือตารางรายการ (Result List) #}
+{% block result_list %}
+
+    <div style="margin-bottom: 20px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        {% if active_config %}
+            background: linear-gradient(to right, #e8f5e9, #c8e6c9); border-left: 5px solid #28a745;
+        {% else %}
+            background: linear-gradient(to right, #ffebee, #ffcdd2); border-left: 5px solid #dc3545;
+        {% endif %}">
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h3 style="margin: 0; color: #333; font-weight: bold;">
+                    🤖 AI Model ที่ใช้งานอยู่ปัจจุบัน (Active Model)
+                </h3>
+                
+                {% if active_config %}
+                    <p style="margin: 5px 0 0 0; font-size: 16px; color: #2e7d32;">
+                        ขณะนี้ระบบกำลังใช้: <strong>{{ active_config.current_model.name }}</strong>
+                    </p>
+                    <div style="margin-top: 5px; font-size: 13px; color: #555;">
+                        API Key Status: 
+                        {% if active_config.last_status_ok %}
+                            <span style="color: green;">✅ เชื่อมต่อปกติ</span>
+                        {% else %}
+                            <span style="color: red;">❌ มีปัญหาการเชื่อมต่อ</span>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p style="margin: 5px 0 0 0; font-size: 16px; color: #c62828;">
+                        ⚠️ ยังไม่มีโมเดลที่เปิดใช้งาน (Inactive)
+                    </p>
+                    <p style="margin: 0; font-size: 13px;">
+                        กรุณาติ๊กเลือก "Is active" ในรายการด้านล่าง เพื่อเปิดใช้งานระบบ AI
+                    </p>
+                {% endif %}
+            </div>
+
+            {% if active_config %}
+            <div>
+                <a href="{{ active_config.pk }}/change/" class="button" style="background-color: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+                    ⚙️ ตั้งค่า / ทดสอบ
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {{ block.super }}
+
+{% endblock %}

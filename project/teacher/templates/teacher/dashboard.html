@@ -114,4 +114,28 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. เช็คว่า Create Form มี Error ส่งกลับมาไหม
+        {% if create_form.errors %}
+            var createModalEl = document.getElementById('createRoomModal');
+            if (createModalEl) {
+                var createModal = new bootstrap.Modal(createModalEl);
+                createModal.show();
+            }
+        {% endif %}
+
+        // 2. เช็คว่า Join Form มี Error ส่งกลับมาไหม
+        {% if join_form.errors %}
+            var joinModalEl = document.getElementById('joinRoomModal');
+            if (joinModalEl) {
+                var joinModal = new bootstrap.Modal(joinModalEl);
+                joinModal.show();
+            }
+        {% endif %}
+    });
+</script>
+
 {% endblock %}
+

@@ -1,173 +1,148 @@
+# ไฟล์: users/admin.py
+
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.hashers import make_password
+from import_export import resources, fields
+from import_export.admin import ImportExportModelAdmin
+from import_export.widgets import CharWidget
+from .models import User, Students, Teachers 
 
-# Register your models here.
-# users/admin.py
-import csv, io, secrets
-from django.contrib import admin, messages
-from django.shortcuts import redirect
-from django.urls import path
-from django.db import transaction
-from openpyxl import load_workbook
+# ---------------------------------------------------------
+# ส่วนที่ 1: UserResource 
+# ---------------------------------------------------------
+class UserResource(resources.ModelResource):
+    
+    # รับค่า 'id' จาก Excel
+    personal_id = fields.Field(attribute='personal_id', column_name='id', widget=CharWidget())
+    
+    # รับค่า 'password'
+    password = fields.Field(attribute='password', column_name='password', widget=CharWidget())
 
-from .models import User, Students, Teachers
-from .forms import UserImportForm
+    class Meta:
+        model = User
+        # ระบุ field ที่จะให้บันทึกลง DB (ไม่ต้องมี full_name_temp)
+        fields = ('email', 'first_name', 'last_name', 'role', 'personal_id', 'password', 'is_active')
+        import_id_fields = ('email',) 
+        skip_unchanged = True
+
+    def before_import_row(self, row, **kwargs):
+        # 1. จัดการ Email
+        email = str(row.get('email', '')).strip().lower()
+        row['email'] = email
+        
+        # 2. จัดการ Password
+        raw_password = str(row.get('password', '')).strip()
+        if raw_password.endswith('.0'): 
+            raw_password = raw_password[:-2]
+            
+        if raw_password:
+            row['password'] = make_password(raw_password)
+        
+        # 3. แยกชื่อ-นามสกุล
+        full_name = str(row.get('name', '')).strip()
+        if full_name:
+            parts = full_name.split(' ', 1)
+            row['first_name'] = parts[0]
+            row['last_name'] = parts[1] if len(parts) > 1 else ""
+
+        # 4. จัดการ Role
+        role = str(row.get('role', '')).strip().upper()
+        valid_roles = ['STUDENT', 'TEACHER', 'ADMIN']
+        if role not in valid_roles:
+            role = 'STUDENT'
+        row['role'] = role
+
+        # 5. เคลียร์ค่า id
+        pid = str(row.get('id', '')).strip()
+        if pid.endswith('.0'): pid = pid[:-2]
+        if pid.lower() == 'none': pid = ""
+        row['id'] = pid
+
+        row['is_active'] = True 
+
+    # -----------------------------------------------------------
+    # จุดที่แก้คือบรรทัดนี้ครับ 👇 (เติม **kwargs เข้าไป)
+    # -----------------------------------------------------------
+    def after_save_instance(self, instance, row=None, **kwargs):
+        """ สร้าง Profile นักเรียน/อาจารย์ หลังจาก User บันทึกเสร็จแล้ว """
+        
+        # ดึงค่า dry_run มาจาก kwargs แทนการรับตรงๆ
+        dry_run = kwargs.get('dry_run', False)
+        
+        if dry_run: return 
+
+        full_name_str = f"{instance.first_name} {instance.last_name}".strip()
+
+        if instance.role == "STUDENT":
+            Teachers.objects.filter(user=instance).delete()
+            Students.objects.update_or_create(user=instance, defaults={"name": full_name_str})
+            
+        elif instance.role == "TEACHER":
+            Students.objects.filter(user=instance).delete()
+            Teachers.objects.update_or_create(user=instance, defaults={"name": full_name_str})
+            
+        else: # ADMIN
+            Students.objects.filter(user=instance).delete()
+            Teachers.objects.filter(user=instance).delete()
 
 
-# ---------- Helpers ----------
-def as_clean_str(v):
-    """แปลงค่าจาก Excel/CSV ให้เป็นสตริงที่สะอาด
-    - 4.0 -> "4"
-    - None -> ""
-    - อื่น ๆ -> str(v)
-    """
-    if v is None:
-        return ""
-    if isinstance(v, float):
-        return str(int(v)) if v.is_integer() else f"{v:.15g}"
-    return str(v)
-
-
+# ---------------------------------------------------------
+# ส่วนที่ 2: UserAdmin
+# ---------------------------------------------------------
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
-    list_display  = ("email", "first_name", "last_name","personal_id", "role", "is_active", "is_staff")
-    list_filter   = ("role", "is_active", "is_staff")
-    search_fields = ("email", "personal_id", "first_name", "last_name")
-    ordering      = ("email",)
-    change_list_template = "admin/users/user/change_list.html"  # ฟอร์ม Import ฝังบนหน้า Users
+class UserAdmin(ImportExportModelAdmin, BaseUserAdmin):
+    resource_class = UserResource
 
-    # --------- เพิ่ม URL สำหรับ import ---------
-    def get_urls(self):
-        urls = super().get_urls()
-        my_urls = [
-            path("import/", self.admin_site.admin_view(self.import_view), name="users_user_import"),
-        ]
-        return my_urls + urls
+    list_display = ("email", "first_name", "last_name", "personal_id", "role", "is_active")
+    list_filter = ("role", "is_active")
+    search_fields = ("email", "personal_id", "first_name")
+    ordering = ("email",)
 
-    # --------- อ่านไฟล์เป็น rows:list[dict] ---------
-    def _read_rows(self, f):
-        if f.name.lower().endswith(".xlsx"):
-            wb = load_workbook(filename=f, data_only=True)
-            ws = wb.active
-            headers = [as_clean_str(c.value).strip().lower() for c in ws[1]]
-            rows = []
-            for r in ws.iter_rows(min_row=2, values_only=True):
-                if all(v is None for v in r):
-                    continue
-                rows.append({headers[i]: as_clean_str(v) for i, v in enumerate(r)})
-            return rows
-        elif f.name.lower().endswith(".csv"):
-            data = f.read().decode("utf-8")
-            reader = csv.DictReader(io.StringIO(data))
-            return [{k.strip().lower(): as_clean_str(v) for k, v in row.items()} for row in reader]
-        else:
-            raise ValueError("รองรับเฉพาะ .xlsx หรือ .csv")
+    fieldsets = (
+        (None, {'fields': ('email', 'password')}),
+        ('Personal Info', {'fields': ('first_name', 'last_name', 'personal_id', 'role')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups')}),
+    )
+    
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'password', 'role', 'personal_id', 'first_name', 'last_name'),
+        }),
+    )
 
-    def _split_name(self, name: str):
-        name = (name or "").strip()
-        if not name:
-            return "", ""
-        return (name, "") if " " not in name else name.split(" ", 1)
+@admin.register(Students)
+class StudentsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'get_user_email', 'get_student_id')
+    search_fields = ('name', 'user__email', 'user__personal_id')
+    # เพื่อให้กรองตามห้องเรียนได้
+    list_filter = ('joined_rooms',) 
 
-    def _norm_email(self, email: str):
-        return (email or "").replace(" ", "").strip().lower()
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "user":
+            kwargs["queryset"] = User.objects.filter(role='STUDENT')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    def get_user_email(self, obj):
+        return obj.user.email
+    get_user_email.short_description = 'Email'
 
-    def _map_role(self, role: str):
-        r = (role or "").strip().upper()
-        return r if r in {"STUDENT", "TEACHER", "ADMIN"} else None
+    def get_student_id(self, obj):
+        return obj.user.personal_id
+    get_student_id.short_description = 'Student ID'
 
-    # --------- ตัวหลัก: Import ----------
-    @transaction.atomic
-    def import_view(self, request):
-        if request.method != "POST":
-            return redirect("admin:users_user_changelist")
+@admin.register(Teachers)
+class TeachersAdmin(admin.ModelAdmin):
+    list_display = ('name', 'get_user_email')
+    search_fields = ('name', 'user__email')
+    list_filter = ('taught_rooms',)
 
-        form = UserImportForm(request.POST, request.FILES)
-        if not form.is_valid():
-            self.message_user(request, "ฟอร์มไม่ถูกต้อง", level=messages.ERROR)
-            return redirect("admin:users_user_changelist")
-
-        dry_run = form.cleaned_data.get("dry_run", False)
-
-        # อ่านไฟล์
-        try:
-            rows = self._read_rows(form.cleaned_data["file"])
-        except Exception as e:
-            self.message_user(request, f"อ่านไฟล์ไม่สำเร็จ: {e}", level=messages.ERROR)
-            return redirect("admin:users_user_changelist")
-
-        created = updated = skipped = 0
-        errors = []
-
-        for idx, row in enumerate(rows, start=2):
-            email = self._norm_email(row.get("email"))
-            password_raw = (row.get("password") or "").strip()   # จะตั้งตามนี้ (hash ใน set_password)
-            full_name = (row.get("name") or "").strip()
-            role_raw = self._map_role(row.get("role"))
-            # รับ ID ได้หลายชื่อคอลัมน์ → เก็บลง personal_id
-            personal_id = (row.get("id") or row.get("ID") or row.get("personal_id") or "").strip()
-            personal_id = as_clean_str(personal_id)
-
-            if not email or not email.endswith("@ubu.ac.th"):
-                errors.append(f"แถว {idx}: email ไม่ใช่ @ubu.ac.th -> {email}")
-                skipped += 1
-                continue
-            if role_raw is None:
-                errors.append(f"แถว {idx}: role ไม่ถูกต้อง -> {row.get('role')}")
-                skipped += 1
-                continue
-
-            first_name, last_name = self._split_name(full_name)
-
-            try:
-                if User.objects.filter(email=email).exists():
-                    # ----- อัปเดต -----
-                    u = User.objects.get(email=email)
-                    u.first_name, u.last_name = first_name, last_name
-                    u.role = role_raw                         # จะไม่ถูกทับเป็น ADMIN แล้ว
-                    if personal_id:
-                        u.personal_id = personal_id
-                    if password_raw:
-                        u.set_password(password_raw)
-                    if not dry_run:
-                        u.save()
-                    updated += 1
-                else:
-                    # ----- สร้างใหม่ -----
-                    if not password_raw:
-                        password_raw = secrets.token_urlsafe(8)  # ถ้าไม่ได้ให้มา จะสุ่ม
-                    u = User(email=email, is_active=True, role=role_raw)
-                    u.first_name, u.last_name = first_name, last_name
-                    if personal_id:
-                        u.personal_id = personal_id
-                    u.set_password(password_raw)                # hash password
-                    if not dry_run:
-                        u.save()
-                    created += 1
-
-                # ----- โปรไฟล์ตาม role (ไม่มี student_id/teacher_id แล้ว) -----
-                if not dry_run:
-                    if role_raw == "STUDENT":
-                        Teachers.objects.filter(user=u).delete()
-                        Students.objects.update_or_create(user=u, defaults={"name": full_name})
-                    elif role_raw == "TEACHER":
-                        Students.objects.filter(user=u).delete()
-                        Teachers.objects.update_or_create(user=u, defaults={"name": full_name})
-                    else:  # ADMIN
-                        Students.objects.filter(user=u).delete()
-                        Teachers.objects.filter(user=u).delete()
-
-            except Exception as e:
-                errors.append(f"แถว {idx}: {e}")
-                skipped += 1
-
-        # สรุปผล
-        level = messages.WARNING if dry_run else messages.SUCCESS
-        self.message_user(
-            request,
-            f"{'(DRY RUN) ' if dry_run else ''}สร้าง {created}, อัปเดต {updated}, ข้าม {skipped} | error={len(errors)}",
-            level=level,
-        )
-        for m in errors[:10]:
-            self.message_user(request, m, level=messages.ERROR)
-
-        return redirect("admin:users_user_changelist")
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "user":
+            kwargs["queryset"] = User.objects.filter(role='TEACHER')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    def get_user_email(self, obj):
+        return obj.user.email
+    get_user_email.short_description = 'Email'
