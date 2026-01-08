@@ -1,92 +1,145 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}แดชบอร์ดนักเรียน{% endblock %}
+{% block title %}แดชบอร์ดนักเรียน{% endblock %} 
 
 {% block content %}
-<div class="container my-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="mb-0">ห้องเรียนของฉัน</h3>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#joinRoomModal">
-            <i class="fas fa-plus-circle me-2"></i>เข้าร่วมห้องเรียนใหม่
+<style>
+    /* ลบกรอบเริ่มต้นของ Dialog ออกให้หมด */
+    #join_room_modal {
+        border: none !important;
+        outline: none !important;
+        padding: 0;
+        background: transparent; /* ให้พื้นหลัง dialog โปร่งใส เพื่อโชว์ตัว modal-box ที่เราแต่งไว้ */
+    }
+
+    /* CSS สีส้ม Accent สำหรับปุ่ม */
+    .btn-custom-accent {
+        background-color: #FFB01D;
+        color: white;
+        border: none;
+    }
+    .btn-custom-accent:hover {
+        background-color: #e59b10;
+        box-shadow: 0 4px 12px rgba(255, 176, 29, 0.4);
+    }
+    
+    /* ปรับแต่งช่องกรอกรหัส */
+    .input-code-modern {
+        background-color: #f9fafb;
+        border: 2px solid #e5e7eb; /* เพิ่มเส้นขอบอ่อนๆ ให้เหมือนในรูป */
+        transition: all 0.3s ease;
+    }
+    .input-code-modern:focus {
+        background-color: #fff;
+        border-color: #FFB01D;
+        box-shadow: 0 0 0 4px rgba(255, 176, 29, 0.1);
+        outline: none;
+    }
+</style>
+
+<div class="container mx-auto my-8 px-4">
+
+    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <h3 class="text-3xl font-bold text-gray-800">ห้องเรียนของฉัน</h3>
+
+        <button class="btn btn-custom-accent shadow-md rounded-full px-6 font-bold" onclick="join_room_modal.showModal()">
+            <i class="fas fa-plus mr-2"></i> เข้าร่วมห้องเรียนใหม่
         </button>
     </div>
 
     {% if joined_rooms %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            {% for room in joined_rooms %}
-                <div class="col">
-                    <a href="{% url 'student:room_detail' room.pk %}" class="text-decoration-none">
-                        <div class="card h-100 shadow-sm room-card">
-                            {% if room.cover_image %}
-                                <img src="{{ room.cover_image.url }}" class="card-img-top" alt="ปกห้อง {{ room.name }}" style="height: 150px; object-fit: cover;">
-                            {% else %}
-                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light text-secondary" style="height: 150px;">
-                                    <i class="fas fa-image" style="font-size: 3rem;"></i>
-                                </div>
-                            {% endif %}
-                            
-                            <div class="card-body">
-                                <h5 class="card-title text-primary text-truncate">{{ room.name }}</h5>
-                                <p class="card-text text-muted">สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</p>
-                            </div>
-                        </div>
-                    </a>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for room in joined_rooms %}
+        <a href="{% url 'student:room_detail' room.pk %}" class="group block h-full">
+            <div class="card bg-white shadow-md hover:shadow-xl transition-all duration-300 h-full border border-gray-100 overflow-hidden hover:-translate-y-1 rounded-2xl">
+                
+                <figure class="h-48 w-full relative bg-gray-50">
+                    {% if room.cover_image %}
+                    <img src="{{ room.cover_image.url }}"
+                        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        alt="ปกห้อง {{ room.name }}">
+                    {% else %}
+                    <div class="flex items-center justify-center w-full h-full text-gray-300">
+                        <i class="fas fa-image text-4xl opacity-50"></i>
+                    </div>
+                    {% endif %}
+                </figure>
+
+                <div class="p-5 flex flex-col gap-1 bg-white">
+                    <h2 class="text-lg font-bold text-gray-900 line-clamp-1 group-hover:text-[#FFB01D] transition-colors">
+                        {{ room.name }}
+                    </h2>
+                    
+                    <div class="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                        <i class="fas fa-chalkboard-teacher text-xs opacity-70"></i>
+                        <span class="truncate font-medium opacity-80">
+                            {{ room.owner.get_full_name|default:room.owner.email }}
+                        </span>
+                    </div>
                 </div>
-            {% endfor %}
-        </div>
+
+            </div>
+        </a>
+        {% endfor %}
+    </div>
     {% else %}
-        <div class="alert alert-info">คุณยังไม่ได้เข้าร่วมห้องเรียนใดๆ ลองใช้รหัสเชิญเพื่อเข้าร่วมห้องเรียนแรกของคุณ!</div>
+    <div class="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-center">
+        <div class="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-gray-300">
+            <i class="fas fa-book-open text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-700">ยังไม่ได้เข้าร่วมห้องเรียน</h3>
+        <p class="text-gray-500 mt-2 mb-6 max-w-sm">คุณยังไม่มีห้องเรียนในรายการ กดปุ่มด้านบนเพื่อเข้าร่วมห้องเรียนแรกของคุณ</p>
+        <button class="btn btn-sm btn-ghost text-[#FFB01D]" onclick="join_room_modal.showModal()">
+            กรอกรหัสเชิญ
+        </button>
+    </div>
     {% endif %}
 </div>
 
-<div class="modal fade" id="joinRoomModal" tabindex="-1" aria-labelledby="joinRoomModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post" action="{% url 'student:dashboard' %}">
-        {% csrf_token %}
-        <div class="modal-header">
-          <h1 class="modal-title fs-5" id="joinRoomModalLabel">เข้าร่วมห้องเรียนด้วยรหัส</h1>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <p>กรุณากรอกรหัสเชิญ (Invite Code) ที่ได้รับจากอาจารย์ผู้สอน</p>
-            
-            <div class="mb-3">
-              <label for="{{ form.code.id_for_label }}" class="form-label">รหัสเชิญ:</label>
-              <input type="text" 
-                     name="{{ form.code.name }}" 
-                     id="{{ form.code.id_for_label }}"
-                     class="form-control {% if form.code.errors %}is-invalid{% endif %}"
-                     placeholder="กรอกรหัส 6 หลักที่นี่"
-                     maxlength="6" 
-                     style="text-transform:uppercase">
+<dialog id="join_room_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white p-0 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden relative border-none">
+        
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 text-gray-400 hover:text-gray-600 z-10 focus:outline-none">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </form>
 
-              {% if form.code.errors %}
-                  <div class="invalid-feedback">
-                      {% for error in form.code.errors %}
-                          {{ error }}
-                      {% endfor %}
-                  </div>
-              {% endif %}
+        <div class="px-8 pt-12 pb-10 text-center">
+            <div class="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#FFB01D]">
+                <i class="fas fa-key text-3xl"></i>
             </div>
-            </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-          <button type="submit" class="btn btn-primary">ยืนยันการเข้าร่วม</button>
+
+            <h3 class="text-2xl font-bold text-gray-800">เข้าร่วมห้องเรียน</h3>
+            <p class="text-gray-400 text-sm mt-2 px-4">กรอกรหัสเชิญ 6 หลักที่คุณได้รับจากอาจารย์</p>
+
+            <form method="post" action="{% url 'student:dashboard' %}" class="mt-8">
+                {% csrf_token %}
+
+                <div class="form-control w-full relative">
+                    <input type="text" name="{{ form.code.name }}" id="{{ form.code.id_for_label }}"
+                        class="input-code-modern w-full text-center text-4xl font-bold text-gray-700 h-24 rounded-2xl tracking-[0.3em] placeholder:text-gray-200 placeholder:tracking-normal uppercase"
+                        placeholder="CODE" maxlength="6" required autocomplete="off">
+                </div>
+
+                {% if form.code.errors %}
+                <div class="mt-4 p-3 bg-red-50 text-red-500 text-sm rounded-xl flex items-center justify-center gap-2">
+                    <i class="fas fa-exclamation-circle"></i>
+                    {% for error in form.code.errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="mt-10">
+                    <button type="submit" class="btn btn-custom-accent w-full text-lg rounded-2xl h-14 font-bold shadow-lg shadow-orange-100">
+                        ยืนยันการเข้าร่วม
+                    </button>
+                </div>
+            </form>
         </div>
-      </form>
     </div>
-  </div>
-</div>
+</dialog>
 
-<style>
-    .room-card {
-        transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
-    }
-    .room-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-    }
-</style>
 {% endblock %}

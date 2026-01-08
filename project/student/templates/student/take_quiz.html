@@ -1,140 +1,276 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}ทำแบบทดสอบ - {{ submission.assignment.title }}{% endblock %}
 
 {% block content %}
+<div class="min-h-screen bg-gray-50 pb-24">
+    <!-- Sticky Timer Header -->
+    <div class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm transition-all duration-300 transform"
+        id="header-timer">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="relative flex items-center justify-center">
+                        <div class="absolute w-full h-full bg-red-100 rounded-full animate-ping opacity-75 hidden"
+                            id="timer-pulse"></div>
+                        <i class="fas fa-clock text-2xl text-red-500 relative z-10"></i>
+                    </div>
+                    <div>
+                        <small class="text-xs text-gray-500 uppercase font-semibold tracking-wider">เวลาที่เหลือ</small>
+                        <div id="timer-display" class="text-xl font-bold text-gray-800 font-mono leading-none">--:--
+                        </div>
+                    </div>
+                </div>
 
-<div class="sticky-top bg-white border-bottom shadow-sm py-2 mb-4" style="z-index: 1020; top: 0;">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-clock fa-2x text-danger me-2 animate__animated animate__pulse animate__infinite"></i>
-                <div>
-                    <small class="text-muted d-block" style="line-height: 1;">เวลาที่เหลือ</small>
-                    <span id="timer-display" class="h4 fw-bold text-danger mb-0">--:--</span>
+                <div class="hidden md:flex items-center">
+                    <span
+                        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800 border border-amber-200 shadow-sm">
+                        <i class="fas fa-exclamation-triangle mr-2"></i> ห้ามรีเฟรชหน้าจอ
+                    </span>
                 </div>
             </div>
-            <div>
-                <span class="badge bg-warning text-dark d-none d-md-inline-block">
-                    <i class="fas fa-exclamation-triangle me-1"></i> ห้ามรีเฟรชหน้าจอ
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-gray-200 rounded-full h-1.5 mt-3 overflow-hidden">
+                <div id="timer-progress" class="bg-red-500 h-1.5 rounded-full transition-all duration-1000 ease-linear"
+                    style="width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Quiz Header Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-2">
+                <i class="fas fa-edit text-blue-500"></i>
+                แบบทดสอบความเข้าใจ
+            </h2>
+            <p class="text-gray-500 text-lg mb-6">{{ submission.assignment.title }}</p>
+            <div class="flex flex-wrap justify-center gap-3">
+                <span
+                    class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">
+                    <i class="fas fa-list-ol mr-2 text-gray-400"></i> จำนวน {{ quiz.total_questions }} ข้อ
+                </span>
+                <span
+                    class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    <i class="fas fa-robot mr-2"></i> AI Generated
                 </span>
             </div>
         </div>
-        <div class="progress mt-2" style="height: 4px;">
-            <div id="timer-progress" class="progress-bar bg-danger" role="progressbar" style="width: 100%;"></div>
-        </div>
-    </div>
-</div>
 
-<div class="container mb-5" style="padding-bottom: 60px;"> <div class="row justify-content-center">
-        <div class="col-md-8">
-            
-            <div class="card border-primary shadow-sm mb-4">
-                <div class="card-body text-center p-4">
-                    <h2 class="card-title text-primary"><i class="fas fa-edit me-2"></i>แบบทดสอบความเข้าใจ</h2>
-                    <p class="lead text-muted">{{ submission.assignment.title }}</p>
-                    <div class="d-flex justify-content-center gap-3">
-                        <span class="badge bg-secondary p-2">จำนวน {{ quiz.total_questions }} ข้อ</span>
-                        <span class="badge bg-info text-dark p-2">AI Generated</span>
+        <form id="quiz-form" method="POST" action="">
+            {% csrf_token %}
+
+            <div id="questions-container" class="space-y-6">
+                {% for question in quiz.questions.all %}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 question-item overflow-hidden transition-all duration-300 hover:shadow-md"
+                    data-question-id="{{ question.id }}">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-start">
+                        <span
+                            class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-sm mr-3">
+                            {{ forloop.counter }}
+                        </span>
+                        <h5 class="text-lg font-medium text-gray-800 pt-0.5 leading-relaxed">
+                            {{ question.text }}
+                        </h5>
+                    </div>
+
+                    <div class="p-6">
+                        {% if question.image %}
+                        <div class="mb-6 flex justify-center bg-gray-50 rounded-lg p-4 border border-gray-100">
+                            <img src="{{ question.image.url }}"
+                                class="max-h-64 h-auto object-contain rounded-lg shadow-sm hover:scale-105 transition-transform duration-300 cursor-zoom-in"
+                                onclick="window.open(this.src, '_blank')">
+                        </div>
+                        {% endif %}
+
+                        <div class="space-y-3">
+                            {% for choice in question.choices.all %}
+                            <label
+                                class="group relative flex items-center p-4 rounded-lg border-2 border-transparent cursor-pointer hover:bg-blue-50 transition-all duration-200 ring-1 ring-gray-100 hover:ring-blue-200 selection-label">
+                                <input
+                                    class="form-radio h-5 w-5 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-offset-0 transition duration-150 ease-in-out mr-4"
+                                    type="radio" name="question_{{ question.id }}" value="{{ choice.id }}" required
+                                    onchange="saveAnswer('{{ question.id }}', '{{ choice.id }}')">
+                                <span class="text-gray-700 group-hover:text-blue-800 font-medium select-none">{{    choice.text }}</span>
+                                <div
+                                    class="absolute inset-0 rounded-lg border-2 border-blue-500 opacity-0 group-hover:opacity-10 pointer-events-none transition-opacity">
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Fixed Bottom Navigation -->
+            <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 transform transition-transform duration-300"
+                id="bottom-nav">
+                <div class="container mx-auto px-4 max-w-4xl">
+                    <div class="flex justify-between items-center py-4 h-20">
+                        <button type="button"
+                            class="inline-flex items-center px-6 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            id="prevBtn" onclick="changePage(-1)">
+                            <i class="fas fa-chevron-left mr-2"></i> ก่อนหน้า
+                        </button>
+
+                        <div class="text-center">
+                            <span
+                                class="inline-block px-4 py-1.5 rounded-full bg-gray-100 text-gray-600 text-sm font-semibold tracking-wide"
+                                id="pageIndicator">
+                                หน้า 1 / ?
+                            </span>
+                        </div>
+
+                        <div class="flex items-center">
+                            <button type="button"
+                                class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                id="nextBtn" onclick="changePage(1)">
+                                ถถัดไป <i class="fas fa-chevron-right ml-2"></i>
+                            </button>
+
+                            <div id="submitContainer" class="hidden">
+                                <button type="submit"
+                                    class="inline-flex items-center px-8 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transform hover:-translate-y-0.5 transition-all duration-200"
+                                    id="submitBtn">
+                                    <i class="fas fa-paper-plane mr-2"></i> ส่งคำตอบ
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <form id="quiz-form" method="POST" action="">
-                {% csrf_token %}
-                
-                <div id="questions-container">
-                    {% for question in quiz.questions.all %}
-                    <div class="card shadow-sm mb-4 question-item">
-                        <div class="card-header bg-white py-3">
-                            <h5 class="mb-0">
-                                <span class="badge bg-primary me-2">ข้อที่ {{ forloop.counter }}</span> 
-                                {{ question.text }}
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            {% if question.image %}
-                                <div class="text-center mb-3">
-                                    <img src="{{ question.image.url }}" class="img-fluid rounded" style="max-height: 250px;">
-                                </div>
-                            {% endif %}
-
-                            <div class="list-group">
-                                {% for choice in question.choices.all %}
-                                <label class="list-group-item list-group-item-action d-flex align-items-center cursor-pointer">
-                                    <input class="form-check-input me-3" type="radio" 
-                                           name="question_{{ question.id }}" 
-                                           value="{{ choice.id }}" required>
-                                    {{ choice.text }}
-                                </label>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-
-                <div class="card shadow-sm bg-light fixed-bottom border-top" style="z-index: 1000;">
-                    <div class="container">
-                        <div class="card-body d-flex justify-content-between align-items-center py-2">
-                            
-                            <button type="button" class="btn btn-secondary px-4" id="prevBtn" onclick="changePage(-1)">
-                                <i class="fas fa-chevron-left me-2"></i> ก่อนหน้า
-                            </button>
-
-                            <span class="fw-bold fs-5" id="pageIndicator">หน้า 1 / ?</span>
-
-                            <button type="button" class="btn btn-primary px-4" id="nextBtn" onclick="changePage(1)">
-                                ถัดไป <i class="fas fa-chevron-right ms-2"></i>
-                            </button>
-
-                            <div id="submitContainer" class="d-none">
-                                <button type="submit" class="btn btn-success px-5" id="submitBtn">
-                                    <i class="fas fa-paper-plane me-2"></i> ส่งคำตอบ
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-
-            </form>
-
-        </div>
+            <!-- Spacer for fixed bottom -->
+            <div class="h-24"></div>
+        </form>
     </div>
 </div>
 
 <style>
-    .cursor-pointer { cursor: pointer; }
-    .list-group-item:hover { background-color: #f8f9fa; }
-    input[type="radio"] { transform: scale(1.2); }
-    
+    /* Custom check styling for active state */
+    input[type="radio"]:checked+span {
+        color: #2563EB;
+        /* blue-600 */
+        font-weight: 600;
+    }
+
+    input[type="radio"]:checked~.absolute {
+        border-color: #2563EB;
+        opacity: 1;
+    }
+
+    input[type="radio"]:checked::after {
+        content: "";
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: #2563EB;
+        transform: scale(0.6);
+    }
+
     .timer-warning {
-        animation: blink 1s infinite;
-        color: red;
+        animation: pulse-red 1s infinite;
+        color: #EF4444 !important;
+        /* red-500 */
     }
-    @keyframes blink {
-        50% { opacity: 0.5; }
-    }
-    
-    /* ปรับแต่ง Sticky Bottom ให้ดูดีขึ้น */
-    .fixed-bottom {
-        box-shadow: 0 -0.5rem 1rem rgba(0,0,0,0.15)!important;
+
+    @keyframes pulse-red {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
     }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
+    // ==========================================
+    // 💾 PART 0: PERSISTENCE (Local Storage)
+    // ==========================================
+    const submissionId = "{{ submission.id }}";
+    const storageKey = `quiz_answers_submission_${submissionId}`;
+
+    // Save answer to local storage
+    window.saveAnswer = function (questionId, choiceId) {
+        try {
+            let answers = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            answers[questionId] = choiceId;
+            localStorage.setItem(storageKey, JSON.stringify(answers));
+
+            // Highlight parent container if needed (visual feedback)
+            const radio = document.querySelector(`input[name="question_${questionId}"][value="${choiceId}"]`);
+            if (radio) highlightSelection(radio);
+
+        } catch (e) {
+            console.error("Storage error:", e);
+        }
+    };
+
+    // Load answers from local storage
+    function loadAnswers() {
+        try {
+            const savedData = localStorage.getItem(storageKey);
+            if (!savedData) return;
+
+            const answers = JSON.parse(savedData);
+            Object.entries(answers).forEach(([qId, cId]) => {
+                const radio = document.querySelector(`input[name="question_${qId}"][value="${cId}"]`);
+                if (radio) {
+                    radio.checked = true;
+                    highlightSelection(radio);
+                }
+            });
+        } catch (e) {
+            console.error("Load storage error:", e);
+        }
+    }
+
+    // Helper to style the selected radio parent
+    function highlightSelection(radioInput) {
+        // Remove active style from all siblings
+        const container = radioInput.closest('.question-item');
+        container.querySelectorAll('label').forEach(lbl => {
+            lbl.classList.remove('bg-blue-50', 'ring-blue-500', 'border-blue-500');
+            lbl.classList.add('border-transparent');
+            const overlay = lbl.querySelector('.absolute');
+            if (overlay) overlay.style.opacity = '0';
+        });
+
+        // Add active style to self
+        const label = radioInput.closest('label');
+        if (label) {
+            label.classList.add('bg-blue-50', 'ring-blue-500');
+            label.classList.remove('border-transparent');
+            const overlay = label.querySelector('.absolute');
+            if (overlay) overlay.style.opacity = '1';
+        }
+    }
+
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+        // Restore answers first
+        loadAnswers();
+
         // ==========================================
-        // 🕒 PART 1: LOGIC จับเวลา (Timer) - ของเดิม
+        // 🕒 PART 1: LOGIC จับเวลา (Timer)
         // ==========================================
-        let timeLeft = parseFloat("{{ remaining_time|default:300 }}"); // ใส่ default กัน error
+        let timeLeft = parseFloat("{{ remaining_time|default:300 }}");
         const initialTime = timeLeft;
         const timerDisplay = document.getElementById('timer-display');
         const progressBar = document.getElementById('timer-progress');
+        const timerPulse = document.getElementById('timer-pulse');
         const quizForm = document.getElementById('quiz-form');
 
         function formatTime(seconds) {
@@ -143,55 +279,72 @@
             return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
-        const timerInterval = setInterval(function() {
-            // อัปเดตเวลา
+        const timerInterval = setInterval(function () {
+            // Update Text
             if (timerDisplay) timerDisplay.textContent = formatTime(timeLeft);
 
-            // อัปเดต Progress Bar
+            // Update Progress
             if (progressBar) {
                 let percentage = (timeLeft / initialTime) * 100;
                 progressBar.style.width = percentage + "%";
 
+                // Color Logic
                 if (percentage < 20) {
-                    progressBar.className = "progress-bar bg-danger";
-                    timerDisplay.classList.add("timer-warning");
+                    progressBar.classList.remove('bg-yellow-500', 'bg-green-500');
+                    progressBar.classList.add('bg-red-600');
+
+                    if (timerDisplay) timerDisplay.classList.add("timer-warning");
+                    if (timerPulse) timerPulse.classList.remove('hidden');
+
                 } else if (percentage < 50) {
-                    progressBar.className = "progress-bar bg-warning";
+                    progressBar.classList.remove('bg-red-500', 'bg-green-500');
+                    progressBar.classList.add('bg-yellow-500');
                 } else {
-                    progressBar.className = "progress-bar bg-success";
+                    progressBar.classList.remove('bg-red-500', 'bg-yellow-500');
+                    progressBar.classList.add('bg-green-500');
                 }
             }
 
-            // หมดเวลา
+            // Timeout Logic
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 if (timerDisplay) timerDisplay.textContent = "00:00";
                 if (progressBar) progressBar.style.width = "0%";
 
-                Swal.fire({
-                    title: 'หมดเวลา!',
-                    text: 'ระบบกำลังส่งคำตอบของคุณอัตโนมัติ...',
-                    icon: 'warning',
-                    timer: 3000,
-                    showConfirmButton: false
-                }).then(() => {
-                    quizForm.submit();
-                });
-                
-                // Fallback
-                setTimeout(() => quizForm.submit(), 3000);
+                handleTimeOut();
             }
 
             timeLeft--;
         }, 1000);
 
+        function handleTimeOut() {
+            Swal.fire({
+                title: 'หมดเวลา!',
+                text: 'ระบบกำลังส่งคำตอบของคุณอัตโนมัติ...',
+                icon: 'warning',
+                timer: 3000,
+                showConfirmButton: false,
+                allowOutsideClick: false
+            }).then(() => {
+                // Clear storage on auto submit? 
+                // localStorage.removeItem(storageKey); 
+                // Maybe keep it just in case of error? 
+                // Let's clear it to be safe so it doesn't mess up next time if ID is reused (unlikely for submission ID)
+                localStorage.removeItem(storageKey);
+                quizForm.submit();
+            });
+
+            // Fallback
+            setTimeout(() => quizForm.submit(), 3000);
+        }
+
 
         // ==========================================
-        // 📄 PART 2: LOGIC แบ่งหน้า (Pagination) - ใหม่
+        // 📄 PART 2: LOGIC แบ่งหน้า (Pagination)
         // ==========================================
-        const itemsPerPage = 5; // ✅ แก้ไขจำนวนข้อต่อหน้าตรงนี้
+        const itemsPerPage = 5;
         let currentPage = 1;
-        
+
         const questions = document.querySelectorAll('.question-item');
         const totalPages = Math.ceil(questions.length / itemsPerPage);
 
@@ -200,8 +353,7 @@
         const submitContainer = document.getElementById('submitContainer');
         const pageIndicator = document.getElementById('pageIndicator');
 
-        // ฟังก์ชันแสดงผล
-        window.changePage = function(delta) { // ประกาศแบบ Global เพื่อให้ HTML เรียกได้
+        window.changePage = function (delta) {
             showPage(currentPage + delta);
         };
 
@@ -213,67 +365,82 @@
             const start = (currentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
 
-            // ซ่อน/แสดง ข้อสอบ
             questions.forEach((q, index) => {
                 if (index >= start && index < end) {
-                    q.classList.remove('d-none');
+                    q.classList.remove('hidden');
+                    q.classList.add('block'); // ensure block display
+
+                    // Add simple fade animation
+                    q.style.opacity = '0';
+                    setTimeout(() => q.style.opacity = '1', 50);
                 } else {
-                    q.classList.add('d-none');
+                    q.classList.add('hidden');
+                    q.classList.remove('block');
                 }
             });
 
-            // อัปเดตตัวเลขหน้า
             if (pageIndicator) pageIndicator.textContent = `หน้า ${currentPage} / ${totalPages}`;
 
-            // จัดการปุ่ม
-            if (prevBtn) prevBtn.disabled = (currentPage === 1);
+            if (prevBtn) {
+                prevBtn.disabled = (currentPage === 1);
+                if (currentPage === 1) prevBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                else prevBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
 
             if (currentPage === totalPages) {
-                if(nextBtn) nextBtn.classList.add('d-none');
-                if(submitContainer) submitContainer.classList.remove('d-none');
+                if (nextBtn) nextBtn.classList.add('hidden');
+                if (submitContainer) submitContainer.classList.remove('hidden');
             } else {
-                if(nextBtn) nextBtn.classList.remove('d-none');
-                if(submitContainer) submitContainer.classList.add('d-none');
+                if (nextBtn) nextBtn.classList.remove('hidden');
+                if (submitContainer) submitContainer.classList.add('hidden');
             }
-            
-            // เลื่อนจอขึ้นบนสุดของข้อแรกในหน้านั้น
+
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // เริ่มต้นแสดงหน้า 1
+        // Initialize
         if (questions.length > 0) {
             showPage(1);
         } else {
-            // กรณีไม่มีข้อสอบ (กัน Error)
-             if(submitContainer) submitContainer.classList.remove('d-none');
-             if(nextBtn) nextBtn.classList.add('d-none');
-             if(prevBtn) prevBtn.classList.add('d-none');
+            if (submitContainer) submitContainer.classList.remove('hidden');
+            if (nextBtn) nextBtn.classList.add('hidden');
+            if (prevBtn) prevBtn.classList.add('hidden');
         }
 
-        // Logic ยืนยันก่อนส่ง
+        // ==========================================
+        // 🚀 SUBMIT HANDLER
+        // ==========================================
         if (quizForm) {
-            quizForm.addEventListener('submit', function(e) {
-                // ถ้าเป็นการส่งจาก Timer (หมดเวลา) จะไม่ถาม
-                if (timeLeft <= 0) return; 
+            quizForm.addEventListener('submit', function (e) {
+                if (timeLeft <= 0) return; // Allow auto-submit without check
 
-                e.preventDefault(); // หยุดฟอร์มไว้ก่อน
+                e.preventDefault();
+
+                // Count answered
+                const totalQuestions = questions.length;
+                const answered = document.querySelectorAll('input[type="radio"]:checked').length;
+                const warningHTML = answered < totalQuestions
+                    ? `<div class="text-red-500 mb-2">⚠️ คุณทำไป ${answered} จาก ${totalQuestions} ข้อ</div>`
+                    : '';
+
                 Swal.fire({
                     title: 'ยืนยันการส่งคำตอบ?',
-                    text: "คุณตรวจสอบครบถ้วนแล้วใช่ไหม",
-                    icon: 'question',
+                    html: `${warningHTML}คุณตรวจสอบครบถ้วนแล้วใช่ไหม`,
+                    icon: answered < totalQuestions ? 'warning' : 'question',
                     showCancelButton: true,
-                    confirmButtonColor: '#198754',
-                    cancelButtonColor: '#6c757d',
+                    confirmButtonColor: '#10B981', // green-500
+                    cancelButtonColor: '#6B7280', // gray-500
                     confirmButtonText: 'ใช่, ส่งเลย!',
                     cancelButtonText: 'กลับไปตรวจทาน'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        quizForm.submit(); // ส่งจริง
+                        // Clear storage before submit success
+                        localStorage.removeItem(storageKey);
+                        quizForm.submit();
                     }
                 });
             });
         }
     });
 </script>
-
 {% endblock %}

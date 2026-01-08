@@ -1,25 +1,43 @@
+{% load static tailwind_tags %}
 <!doctype html>
-<html lang="en">
+<html lang="th" data-theme="mytheme">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Autocode Grad{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    {% tailwind_css %}
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+      /* ตั้งค่า Font สำรองเผื่อกรณี Tailwind โหลดช้า */
+      body {
+        font-family: 'Sarabun', sans-serif;
+      }
+    </style>
+
     {% block extra_head %}{% endblock %}
   </head>
-  <body>
+  
+  <body class="bg-base-200 text-neutral min-h-screen antialiased flex flex-col transition-colors duration-300">
 
-    {% include "includes/navbar.html" %}
+    <header class="sticky top-0 z-50 shadow-sm">
+        {% include "includes/navbar.html" %}
+    </header>
     
-    <main>
+    <main class="container mx-auto px-4 py-6 flex-grow max-w-7xl">
         {% block content %}
         {% endblock %}
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <footer class="p-4 text-center text-sm opacity-50">
+        <p>&copy; 2024 Autocode Grad. All rights reserved.</p>
+    </footer>
+
     {% block extra_scripts %}{% endblock %}
   </body>
 </html>

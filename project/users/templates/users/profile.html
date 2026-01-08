@@ -1,78 +1,110 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container my-4">
-    <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h4 class="mb-0"><i class="fas fa-id-card me-2"></i>โปรไฟล์ของฉัน</h4>
+<div class="container mx-auto px-4 py-8 max-w-5xl">
+    <div class="bg-[#FFFFFF] shadow-xl rounded-box overflow-hidden">
+        <!-- Header -->
+        <div class="bg-[#5651FF] text-white p-6 flex items-center">
+            <i class="fas fa-id-card text-2xl mr-3"></i>
+            <h4 class="text-2xl font-bold">โปรไฟล์ของฉัน</h4>
         </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-8">
-                    <h5 class="text-muted mb-3">ข้อมูลส่วนตัว</h5>
-                    <dl class="row">
-                        <dt class="col-sm-4">ชื่อ-สกุล:</dt>
-                        <dd class="col-sm-8">{{ user.get_full_name|default:"-" }}</dd>
-                        
-                        <dt class="col-sm-4">Email:</dt>
-                        <dd class="col-sm-8">{{ user.email }}</dd>
 
-                        <dt class="col-sm-4">ตำแหน่ง:</dt>
-                        <dd class="col-sm-8">
-                            <span class="badge bg-info text-dark">{{ user.get_role_display }}</span>
-                        </dd>
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Main Info -->
+                <div class="md:col-span-2">
+                    <h5 class="text-gray-500 font-semibold mb-6 uppercase tracking-wider text-sm">ข้อมูลส่วนตัว</h5>
 
-                        <dt class="col-sm-4">รหัสนักศึกษา/บุคลากร:</dt>
-                        <dd class="col-sm-8">{{ user.personal_id|default:"-" }}</dd>
-                    </dl>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-y-6 gap-x-4 mb-8">
+                        <div class="sm:col-span-1 font-semibold text-gray-700">ชื่อ-สกุล:</div>
+                        <div class="sm:col-span-2 text-gray-900 font-medium">{{ user.get_full_name|default:"-" }}</div>
 
-                    <hr class="my-4">
-                    <div class="d-flex align-items-center">
-                        <div class="me-auto">
-                            <h6 class="fw-bold"><i class="fas fa-shield-alt me-2"></i>ความปลอดภัย</h6>
-                            <p class="text-muted small mb-0">คุณสามารถเปลี่ยนรหัสผ่านได้ที่นี่</p>
+                        <div class="sm:col-span-1 font-semibold text-gray-700">Email:</div>
+                        <div class="sm:col-span-2 text-gray-900">{{ user.email }}</div>
+
+                        <div class="sm:col-span-1 font-semibold text-gray-700">ตำแหน่ง:</div>
+                        <div class="sm:col-span-2">
+                            <!-- Plain text for Position as requested -->
+                            <span class="text-gray-900 font-medium">
+                                {{ user.get_role_display }}
+                            </span>
                         </div>
-                        <a href="{% url 'users:password_change' %}" class="btn btn-warning text-dark shadow-sm">
-                            <i class="fas fa-key me-2"></i>เปลี่ยนรหัสผ่าน
+
+                        <div class="sm:col-span-1 font-semibold text-gray-700">รหัสนักศึกษา/บุคลากร:</div>
+                        <div class="sm:col-span-2 text-gray-900 font-mono">{{ user.personal_id|default:"-" }}</div>
+                    </div>
+
+                    <div class="divider my-6"></div>
+
+                    <div class="flex flex-col sm:flex-row items-center justify-between bg-[#F5F5F5] p-6 rounded-2xl">
+                        <div class="mb-4 sm:mb-0">
+                            <h6 class="font-bold flex items-center text-lg">
+                                <i class="fas fa-shield-alt mr-2 text-[#FF7E00]"></i> ความปลอดภัย
+                            </h6>
+                            <p class="text-gray-500 text-sm mt-1">คุณสามารถเปลี่ยนรหัสผ่านได้ที่นี่</p>
+                        </div>
+                        <a href="{% url 'users:password_change' %}"
+                            class="btn bg-[#FFB01D] border-none text-white hover:bg-[#E59E1A] shadow-md hover:shadow-lg transition-all rounded-full px-8 py-2 h-auto text-lg">
+                            <i class="fas fa-key mr-2"></i>เปลี่ยนรหัสผ่าน
                         </a>
                     </div>
                 </div>
-                
-                <div class="col-md-4 text-center border-start">
-                    <div class="mt-3">
-                        {% if profile and profile.profile_image %}
-                            <img src="{{ profile.profile_image.url }}" alt="Profile Image" class="img-thumbnail rounded-circle mb-3 shadow-sm" width="160" height="160" style="object-fit: cover;">
-                        {% else %}
-                            <div class="d-inline-block rounded-circle bg-light text-secondary mb-3 d-flex align-items-center justify-content-center mx-auto shadow-sm" style="width: 160px; height: 160px;">
-                                <i class="fas fa-user fa-4x"></i>
+
+                <!-- Profile Image & Update -->
+                <div class="md:col-span-1 flex flex-col items-center md:border-l border-[#F5F5F5] md:pl-8">
+                    <div class="avatar mb-6">
+                        <!-- Ensure rounded-full works with overflow-hidden -->
+                        <div
+                            class="w-48 h-48 rounded-full ring ring-[#5651FF] ring-offset-[#FFFFFF] ring-offset-4 shadow-xl overflow-hidden">
+                            {% if profile and profile.profile_image %}
+                            <img src="{{ profile.profile_image.url }}" alt="Profile Image"
+                                class="object-cover w-full h-full" />
+                            {% else %}
+                            <div class="bg-gray-100 w-full h-full flex items-center justify-center text-gray-400">
+                                <i class="fas fa-user fa-5x"></i>
                             </div>
-                        {% endif %}
-                        
-                        {% if image_form %}
-                        <form method="post" enctype="multipart/form-data" class="mt-2">
-                            {% csrf_token %}
-                            <label for="{{ image_form.profile_image.id_for_label }}" class="form-label fw-bold text-primary">อัปเดตรูปโปรไฟล์</label>
-                            
-                            <div class="input-group input-group-sm">
-                                {{ image_form.profile_image }}
-                                <button class="btn btn-primary" type="submit">
-                                    <i class="fas fa-upload"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if image_form %}
+                    <form method="post" enctype="multipart/form-data" class="w-full max-w-xs text-center">
+                        {% csrf_token %}
+                        <div class="form-control w-full">
+                            <label class="label justify-center">
+                                <span class="label-text font-bold text-[#5651FF] text-lg">อัปเดตรูปโปรไฟล์</span>
+                            </label>
+
+                            <div class="flex flex-col items-center gap-3">
+                                <!-- Hidden file input with custom label button -->
+                                <input type="file" name="{{ image_form.profile_image.name }}"
+                                    id="{{ image_form.profile_image.id_for_label }}" class="hidden" accept="image/*"
+                                    onchange="document.getElementById('file-name').textContent = this.files[0] ? this.files[0].name : 'ยังไม่ได้เลือกไฟล์'" />
+
+                                <label for="{{ image_form.profile_image.id_for_label }}"
+                                    class="btn bg-white border border-[#5651FF] text-[#5651FF] hover:bg-[#5651FF] hover:text-white transition-all rounded-full px-6 gap-2 cursor-pointer w-full">
+                                    <i class="fas fa-camera"></i> เลือกรูปภาพใหม่
+                                </label>
+
+                                <span id="file-name"
+                                    class="text-sm text-gray-500 truncate max-w-[200px]">ยังไม่ได้เลือกไฟล์</span>
+
+                                <button
+                                    class="btn bg-[#5651FF] border-none text-white hover:bg-[#4843E6] rounded-full px-8 w-full shadow-md"
+                                    type="submit">
+                                    <i class="fas fa-cloud-upload-alt mr-2"></i> อัปโหลด
                                 </button>
                             </div>
-                            <div class="form-text small text-muted">รองรับไฟล์ .jpg, .png</div>
-                        </form>
-                        {% endif %}
-                    </div>
+
+                            <label class="label justify-center mt-2">
+                                <span class="label-text-alt text-gray-400">รองรับไฟล์ .jpg, .png</span>
+                            </label>
+                        </div>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-    /* ปรับแต่ง input file ให้ดูดีขึ้นถ้าไม่ได้ใช้ bootstrap class ใน form */
-    input[type=file] {
-        max-width: 100%;
-    }
-</style>
 {% endblock %}

@@ -1,69 +1,110 @@
 {% extends "base.html" %}
-{% load quiz_tags %} 
+{% load quiz_tags %}
 {% block title %}ผลการสอบ - {{ submission.assignment.title }}{% endblock %}
 
 {% block content %}
-<div class="container mt-5 mb-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            
-            <div class="card border-info shadow-sm mb-4">
-                <div class="card-body text-center p-4">
-                    <h5 class="text-muted">ผลการทดสอบ</h5>
-                    <h1 class="display-4 fw-bold {% if quiz.score >= quiz.total_questions|add:"-1" %}text-success{% else %}text-primary{% endif %}">
-                        {{ quiz.score }} / {{ quiz.total_questions }}
-                    </h1>
-                    <p class="mb-3">คะแนนของคุณ</p>
-                    <a href="{% url 'student:assignment_detail' submission.assignment.pk %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>กลับหน้ารายละเอียดงาน
-                    </a>
-                </div>
+<div class="min-h-screen bg-gray-50 pb-20 pt-10">
+    <div class="container mx-auto px-4 max-w-4xl">
+
+        <!-- Score Card -->
+        <div
+            class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-10 text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+
+            <h5 class="text-gray-500 font-medium tracking-wide uppercase text-sm mb-4">ผลการทดสอบ</h5>
+
+            <div class="mb-6 relative inline-block">
+                <h1
+                    class="text-7xl font-extrabold {% if quiz.score >= quiz.total_questions|add:'-1' %}text-[#00964F]{% else %}text-blue-600{% endif %} font-mono tracking-tighter">
+                    {{ quiz.score }}<span class="text-3xl text-gray-400 font-light mx-2">/</span>{{ quiz.total_questions }}
+                </h1>
+
+                <!-- Decorative circles -->
+                <div class="absolute -top-6 -right-8 w-16 h-16 bg-blue-50 rounded-full opacity-50 -z-10"></div>
+                <div class="absolute -bottom-4 -left-6 w-12 h-12 bg-indigo-50 rounded-full opacity-50 -z-10"></div>
             </div>
 
+            <p class="text-gray-600 text-lg mb-8 font-light">คะแนนของคุณสำหรับ <span
+                    class="font-medium text-gray-800">{{ submission.assignment.title }}</span></p>
+
+            <a href="{% url 'student:assignment_detail' submission.assignment.pk %}"
+                class="inline-flex items-center px-8 py-3 rounded-full bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 hover:text-blue-600 hover:border-blue-300 transition-all duration-300 shadow-sm hover:shadow-md group">
+                <i class="fas fa-arrow-left mr-2 group-hover:-translate-x-1 transition-transform"></i>
+                กลับหน้ารายละเอียดงาน
+            </a>
+        </div>
+
+        <!-- Questions List -->
+        <div class="space-y-6">
             {% for question in questions %}
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header bg-white py-3">
-                        <h6 class="mb-0">
-                            <span class="badge bg-secondary me-2">ข้อที่ {{ question.order }}</span>
-                            {{ question.text }}
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="list-group">
-                            {% for choice in question.choices.all %}
-                                {% with user_selected_id=student_answers_dict|get_item:question.id %}
-                                    
-                                    {% if choice.is_correct %}
-                                        <div class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
-                                            <span>
-                                                <i class="fas fa-check-circle me-2"></i> {{ choice.text }}
-                                            </span>
-                                            <span class="badge bg-success">คำตอบที่ถูก</span>
-                                        </div>
+            <div
+                class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-start">
+                    <span
+                        class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 font-bold text-sm mr-4 mt-0.5">
+                        {{ question.order }}
+                    </span>
+                    <h6 class="text-lg font-medium text-gray-800 leading-relaxed">
+                        {{ question.text }}
+                    </h6>
+                </div>
 
-                                    {% elif choice.id == user_selected_id and not choice.is_correct %}
-                                        <div class="list-group-item list-group-item-danger d-flex justify-content-between align-items-center">
-                                            <span>
-                                                <i class="fas fa-times-circle me-2"></i> {{ choice.text }}
-                                            </span>
-                                            <span class="badge bg-danger">คุณเลือกข้อนี้</span>
-                                        </div>
-                                    
-                                    {% elif choice.id == user_selected_id and choice.is_correct %}
-                                         {% else %}
-                                        <div class="list-group-item text-muted">
-                                            <i class="far fa-circle me-2"></i> {{ choice.text }}
-                                        </div>
-                                    {% endif %}
+                <div class="p-6">
+                    <div class="space-y-3">
+                        {% for choice in question.choices.all %}
+                        {% with user_selected_id=student_answers_dict|get_item:question.id %}
 
-                                {% endwith %}
-                            {% endfor %}
+                        {% if choice.is_correct %}
+                        <!-- Correct Answer Style -->
+                        <div
+                            class="flex justify-between items-center p-4 rounded-lg border bg-[#00964F]/5 border-[#00964F] text-[#00964F]">
+                            <div class="flex items-center">
+                                <div
+                                    class="flex-shrink-0 w-6 h-6 rounded-full bg-[#00964F] text-white flex items-center justify-center mr-3 text-xs">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                <span class="font-medium">{{ choice.text }}</span>
+                            </div>
+                            <span
+                                class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#00964F] text-white">
+                                คำตอบที่ถูก
+                            </span>
                         </div>
+
+                        {% elif choice.id == user_selected_id and not choice.is_correct %}
+                        <!-- User Selected WRONG Answer Style -->
+                        <div
+                            class="flex justify-between items-center p-4 rounded-lg border bg-[#D3302F]/5 border-[#D3302F] text-[#D3302F]">
+                            <div class="flex items-center">
+                                <div
+                                    class="flex-shrink-0 w-6 h-6 rounded-full bg-[#D3302F] text-white flex items-center justify-center mr-3 text-xs">
+                                    <i class="fas fa-times"></i>
+                                </div>
+                                <span class="font-medium">{{ choice.text }}</span>
+                            </div>
+                            <span
+                                class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#D3302F] text-white">
+                                คุณเลือกข้อนี้
+                            </span>
+                        </div>
+
+                        {% else %}
+                        <!-- Neutral / Other Choices -->
+                        <div
+                            class="flex items-center p-4 rounded-lg border border-gray-100 bg-white text-gray-500 hover:bg-gray-50 transition-colors">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full border-2 border-gray-200 mr-3"></div>
+                            <span>{{ choice.text }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% endwith %}
+                        {% endfor %}
                     </div>
                 </div>
+            </div>
             {% endfor %}
-
         </div>
+
     </div>
 </div>
 {% endblock %}

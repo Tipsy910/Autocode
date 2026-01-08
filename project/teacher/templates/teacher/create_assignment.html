@@ -1,190 +1,242 @@
 {% extends "base.html" %}
 
-{% block title %}สร้างงานใหม่ - {{ room.name }}{% endblock %}
+{% block title %}สร้างงานใหม่ - {{ room.name }} | {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0"><i class="fas fa-plus-circle me-2"></i>สร้างงานใหม่สำหรับห้อง: {{ room.name }}</h3>
+<div class="container mx-auto px-4 py-8 max-w-4xl text-left">
+    <div class="mb-8 animate-fadeIn text-center sm:text-left">
+        <div class="flex items-center justify-center sm:justify-start gap-3 mb-2 opacity-80 text-primary">
+            <i class="fas fa-plus-circle text-xl"></i>
+            <span class="font-bold uppercase tracking-widest text-sm">สร้างงานใหม่</span>
+        </div>
+        <h2 class="text-3xl font-black text-gray-900 leading-tight">สร้างงานใหม่สำหรับห้อง: <span
+                class="text-primary">{{ room.name }}</span></h2>
+    </div>
+
+    <div class="card bg-white border border-gray-100 rounded-none shadow-xl overflow-hidden">
+        <div class="card-body p-6 sm:p-10">
+            <form method="post" enctype="multipart/form-data" class="space-y-8">
+                {% csrf_token %}
+
+                <section class="space-y-6 text-left">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                            <i class="fas fa-info"></i>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-800">ข้อมูลพื้นฐาน</h4>
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label for="{{ form.title.id_for_label }}" class="label">
+                            <span class="label-text font-bold text-gray-700">{{ form.title.label }}</span>
+                        </label>
+                        <input type="text" name="{{ form.title.name }}" id="{{ form.title.id_for_label }}"
+                            value="{{ form.title.value|default:'' }}"
+                            class="input input-bordered w-full rounded-xl focus:ring-2 focus:ring-primary/20 transition-all {% if form.title.errors %}input-error{% endif %}"
+                            placeholder="ระบุหัวข้อของงานเช่น 'การบ้านบทที่ 1'">
+                        {% if form.title.errors %}
+                        <label class="label">
+                            <span class="label-text-alt text-error font-semibold">{{ form.title.errors|striptags }}</span>
+                        </label>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label for="{{ form.description.id_for_label }}" class="label">
+                            <span class="label-text font-bold text-gray-700">{{ form.description.label }} (ไม่บังคับ)</span>
+                        </label>
+                        <textarea name="{{ form.description.name }}" id="{{ form.description.id_for_label }}"
+                            class="textarea textarea-bordered h-32 w-full rounded-xl focus:ring-2 focus:ring-primary/20 transition-all"
+                            placeholder="อธิบายรายละเอียดของงาน...">{{ form.description.value|default:'' }}</textarea>
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label class="label">
+                            <span class="label-text font-bold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-file-pdf text-red-500"></i> {{ form.problem_file.label }} (PDF เท่านั้น)
+                            </span>
+                        </label>
+                        <div class="relative group">
+                            <input type="file" name="{{ form.problem_file.name }}" id="{{ form.problem_file.id_for_label }}" accept=".pdf"
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <div class="flex items-center gap-4 px-6 py-4 border-2 border-dashed border-gray-200 rounded-2xl group-hover:bg-blue-50/30 group-hover:border-primary transition-all duration-300">
+                                <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center group-hover:scale-110 transition-transform text-primary">
+                                    <i class="fas fa-cloud-upload-alt text-2xl"></i>
+                                </div>
+                                <div class="overflow-hidden">
+                                    <p class="text-sm font-bold text-gray-700">คลิกเพื่อเลือกไฟล์ หรือลากมาวางที่นี่</p>
+                                    <p class="text-xs text-gray-400 mt-1 truncate" id="file-name-1">ยังไม่ได้เลือกไฟล์ (PDF เท่านั้น)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="divider"></div>
+
+                <section class="space-y-6 text-left">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-800">การตั้งค่าการส่งงาน</h4>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-control w-full">
+                            <label class="label"><span class="label-text font-bold text-gray-700">{{ form.due_date.label }}</span></label>
+                            <input type="datetime-local" name="{{ form.due_date.name }}" id="{{ form.due_date.id_for_label }}"
+                                value="{{ form.due_date.value|date:'Y-m-d\TH:i' }}"
+                                class="input input-bordered w-full rounded-xl focus:ring-2 focus:ring-primary/20 transition-all">
+                        </div>
+                        <div class="form-control w-full">
+                            <label class="label"><span class="label-text font-bold text-gray-700">{{ form.score.label }}</span></label>
+                            <input type="number" name="{{ form.score.name }}" id="{{ form.score.id_for_label }}"
+                                value="{{ form.score.value|default:'5' }}"
+                                class="input input-bordered w-full rounded-xl focus:ring-2 focus:ring-primary/20 transition-all">
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                        <label class="label cursor-pointer flex items-center justify-start gap-4">
+                            <input type="checkbox" name="{{ form.allow_late_submission.name }}" id="{{ form.allow_late_submission.id_for_label }}" 
+                                {% if form.allow_late_submission.value %} checked {% endif %} class="toggle toggle-primary shrink-0 transition-all">
+                            <span class="label-text font-bold text-gray-700">{{ form.allow_late_submission.label }}</span>
+                        </label>
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label class="label"><span class="label-text font-bold text-gray-700">{{ form.allowed_submission_types.label }}</span></label>
+                        <div class="bg-white border border-gray-100 rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {% for checkbox in form.allowed_submission_types %}
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" name="{{ form.allowed_submission_types.name }}" value="{{ checkbox.data.value }}" 
+                                    id="{{ checkbox.id_for_label }}" {% if checkbox.data.selected %}checked{% endif %} class="checkbox checkbox-primary rounded-lg shrink-0">
+                                <span class="text-gray-600 font-medium group-hover:text-gray-900 transition-colors leading-tight">{{ checkbox.choice_label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label class="label">
+                            <span class="label-text font-bold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-code text-blue-500"></i> {{ form.test_case_file.label }} (สำหรับ AI)
+                            </span>
+                        </label>
+                        <div class="relative group">
+                            <input type="file" name="{{ form.test_case_file.name }}" id="{{ form.test_case_file.id_for_label }}"
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <div class="flex items-center gap-4 px-6 py-4 border-2 border-dashed border-gray-200 rounded-2xl group-hover:bg-blue-50/30 group-hover:border-primary transition-all duration-300">
+                                <div class="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-primary transition-colors">
+                                    <i class="fas fa-file-code text-xl"></i>
+                                </div>
+                                <div class="overflow-hidden">
+                                    <p class="text-sm font-bold text-gray-700">อัปโหลดไฟล์ Test Case</p>
+                                    <p class="text-xs text-gray-400 mt-1 truncate" id="file-name-2">เลือกไฟล์สำหรับใช้ตรวจงานด้วย AI</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="divider"></div>
+
+                <section class="space-y-4 text-left">
+                    <div class="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-5 transition-all">
+                        <label class="label cursor-pointer flex items-center justify-start gap-4">
+                            <input type="checkbox" name="{{ form.enable_ai_quiz.name }}" id="{{ form.enable_ai_quiz.id_for_label }}" 
+                                {% if form.enable_ai_quiz.value %}checked{% endif %} class="toggle toggle-warning shrink-0">
+                            <div>
+                                <span class="label-text font-bold text-amber-700 flex items-center gap-2">
+                                    <i class="fas fa-magic"></i> {{ form.enable_ai_quiz.label }}
+                                </span>
+                                <p class="text-[11px] text-amber-600/70 font-medium mt-0.5">{{ form.enable_ai_quiz.help_text }}</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="quiz-settings-area" class="hidden animate-fadeInDown">
+                        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="form-control w-full">
+                                <label class="label py-1"><span class="label-text text-xs font-bold text-gray-600">{{ form.quiz_question_count.label }}</span></label>
+                                <input type="number" name="{{ form.quiz_question_count.name }}" id="{{ form.quiz_question_count.id_for_label }}"
+                                    value="{{ form.quiz_question_count.value|default:'5' }}" class="input input-sm input-bordered rounded-lg w-full">
+                            </div>
+                            <div class="form-control w-full">
+                                <label class="label py-1"><span class="label-text text-xs font-bold text-gray-600">{{ form.quiz_choice_count.label }}</span></label>
+                                <input type="number" name="{{ form.quiz_choice_count.name }}" id="{{ form.quiz_choice_count.id_for_label }}"
+                                    value="{{ form.quiz_choice_count.value|default:'4' }}" class="input input-sm input-bordered rounded-lg w-full">
+                            </div>
+                            <div class="form-control w-full">
+                                <label class="label py-1"><span class="label-text text-xs font-bold text-gray-600">{{ form.quiz_time_limit.label }} (นาที)</span></label>
+                                <input type="number" name="{{ form.quiz_time_limit.name }}" id="{{ form.quiz_time_limit.id_for_label }}"
+                                    value="{{ form.quiz_time_limit.value|default:'10' }}" class="input input-sm input-bordered rounded-lg w-full">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="flex flex-col sm:flex-row justify-end gap-4 pt-6">
+                    <a href="{% url 'room:teacher_detail' pk=room.id %}"
+                        class="btn border-none rounded-xl text-white px-10 order-2 sm:order-1 transition-all hover:opacity-90 active:scale-95 shadow-md"
+                        style="background-color: #D3302F;">
+                        ยกเลิก
+                    </a>
+                    <button type="submit"
+                        class="btn border-none rounded-xl text-white px-12 order-1 sm:order-2 shadow-lg transition-all hover:opacity-90 active:scale-95"
+                        style="background-color: #5651FF;">
+                        <i class="fas fa-save mr-2"></i> บันทึกงานมอบหมาย
+                    </button>
                 </div>
-                
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-
-                        <div class="mb-3">
-                            <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">
-                                {{ form.title.label }}
-                            </label>
-                            {{ form.title }}
-                            <div class="text-danger small">{{ form.title.errors }}</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
-                                {{ form.description.label }}
-                            </label>
-                            {{ form.description }}
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="{{ form.problem_file.id_for_label }}" class="form-label">
-                                <i class="fas fa-file-pdf text-danger"></i> {{ form.problem_file.label }} (ถ้ามี)
-                            </label>
-                            {{ form.problem_file }}
-                            {% if form.problem_file.errors %}
-                                <div class="alert alert-danger p-1 small mt-1">{{ form.problem_file.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.due_date.id_for_label }}" class="form-label fw-bold">
-                                    {{ form.due_date.label }}
-                                </label>
-                                {{ form.due_date }}
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label for="{{ form.score.id_for_label }}" class="form-label fw-bold">
-                                    {{ form.score.label }}
-                                </label>
-                                {{ form.score }}
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="p-3 border rounded bg-light d-flex align-items-center">
-                                <div class="form-check form-switch mb-0">
-                                    {{ form.allow_late_submission }}
-                                    <label class="form-check-label fw-bold ms-2" for="{{ form.allow_late_submission.id_for_label }}">
-                                        {{ form.allow_late_submission.label }}
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="form-text mt-1 text-muted">
-                                <i class="fas fa-info-circle"></i> {{ form.allow_late_submission.help_text }}
-                            </div>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">{{ form.allowed_submission_types.label }}</label>
-                            <div class="border rounded p-2">
-                                {% for checkbox in form.allowed_submission_types %}
-                                <div class="form-check">
-                                    {{ checkbox.tag }}
-                                    <label class="form-check-label" for="{{ checkbox.id_for_label }}">
-                                        {{ checkbox.choice_label }}
-                                    </label>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            <div class="form-text">{{ form.allowed_submission_types.help_text }}</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="{{ form.test_case_file.id_for_label }}" class="form-label fw-bold">
-                                {{ form.test_case_file.label }}
-                            </label>
-                            {{ form.test_case_file }}
-                            <div class="form-text">{{ form.test_case_file.help_text }}</div>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <div class="mb-3">
-                            <div class="p-3 border border-warning rounded bg-white">
-                                <div class="form-check form-switch">
-                                    {{ form.enable_ai_quiz }}
-                                    <label class="form-check-label fw-bold ms-2 text-warning" for="{{ form.enable_ai_quiz.id_for_label }}">
-                                        <i class="fas fa-magic me-1"></i> อนุญาตให้นักเรียนสร้าง AI Quiz
-                                    </label>
-                                </div>
-                                <div class="form-text ms-4 mt-2">
-                                    <small>หากเปิด: นักเรียนสามารถกดให้ AI สร้างแบบทดสอบได้ <br>
-                                    หากปิด: นักเรียนจะส่งงานได้อย่างเดียว</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="quiz-settings-area" style="display: none;">
-                            <div class="card card-body bg-light border-0 mb-3">
-                                <h5 class="mb-3 text-primary">
-                                    <i class="fas fa-cogs me-2"></i>ตั้งค่า AI Quiz Generation
-                                </h5>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.quiz_question_count.id_for_label }}" class="form-label">
-                                            {{ form.quiz_question_count.label }}
-                                        </label>
-                                        {{ form.quiz_question_count }}
-                                        <div class="form-text">{{ form.quiz_question_count.help_text }}</div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.quiz_choice_count.id_for_label }}" class="form-label">
-                                            {{ form.quiz_choice_count.label }}
-                                        </label>
-                                        {{ form.quiz_choice_count }}
-                                        <div class="form-text">{{ form.quiz_choice_count.help_text }}</div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ form.quiz_time_limit.id_for_label }}" class="form-label">
-                                        <i class="fas fa-clock me-1"></i> {{ form.quiz_time_limit.label }}
-                                    </label>
-                                    {{ form.quiz_time_limit }}
-                                    <div class="form-text">{{ form.quiz_time_limit.help_text }}</div>
-                                </div>
-
-                            </div>
-                        </div>
-
-                        <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
-                            <a href="{% url 'room:teacher_detail' pk=room.id %}" class="btn btn-secondary">
-                                ยกเลิก
-                            </a>
-                            <button type="submit" class="btn btn-primary px-4">
-                                <i class="fas fa-save me-2"></i> บันทึกงานมอบหมาย
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>
 
+<style>
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeInDown {
+        animation: fadeInDown 0.3s ease-out forwards;
+    }
+</style>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // อ้างอิง ID ของ Checkbox AI Quiz
+        // AI Quiz Toggle Logic
         const toggleSwitch = document.getElementById('{{ form.enable_ai_quiz.id_for_label }}');
         const settingsArea = document.getElementById('quiz-settings-area');
-
-        function toggleSettings() {
-            if (toggleSwitch && settingsArea) {
+        if (toggleSwitch && settingsArea) {
+            const toggleSettings = () => {
                 if (toggleSwitch.checked) {
-                    settingsArea.style.display = 'block'; // แสดง
-                    // เพิ่ม Animation เล็กน้อย
-                    settingsArea.style.opacity = 0;
-                    setTimeout(() => { settingsArea.style.opacity = 1; settingsArea.style.transition = 'opacity 0.3s'; }, 10);
+                    settingsArea.classList.remove('hidden');
                 } else {
-                    settingsArea.style.display = 'none';  // ซ่อน
+                    settingsArea.classList.add('hidden');
                 }
-            }
-        }
-
-        // เรียกทำงานครั้งแรก
-        if (toggleSwitch) {
+            };
             toggleSettings();
             toggleSwitch.addEventListener('change', toggleSettings);
         }
+
+        // File Display Logic
+        const setupFileDisplay = (inputId, displayId) => {
+            const input = document.getElementById(inputId);
+            const display = document.getElementById(displayId);
+            if (input && display) {
+                input.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        display.innerText = "เลือกไฟล์แล้ว: " + e.target.files[0].name;
+                        display.classList.add('text-primary', 'font-bold');
+                    }
+                });
+            }
+        };
+        setupFileDisplay('{{ form.problem_file.id_for_label }}', 'file-name-1');
+        setupFileDisplay('{{ form.test_case_file.id_for_label }}', 'file-name-2');
     });
 </script>
+
 {% endblock %}

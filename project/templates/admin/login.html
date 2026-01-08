@@ -1,0 +1,102 @@
+{% extends "admin/login.html" %}
+{% load i18n static tailwind_tags %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {% tailwind_css %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* ล้างสไตล์เดิมของ AdminLTE ที่ทำให้ Layout พัง */
+        body.login-page { 
+            background: #F5F5F5 !important; 
+            font-family: 'Kanit', sans-serif !important;
+            display: flex !important; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        /* บังคับซ่อนส่วนประกอบเดิมของ Jazzmin ทั้งหมด */
+        .login-box { width: 100% !important; max-width: none !important; margin: 0 !important; background: transparent !important; }
+        .login-box .card { background: transparent !important; border: none !important; box-shadow: none !important; }
+        .login-logo, .login-box-msg { display: none !important; }
+        
+        /* แก้ปัญหา Input ลอยซ้อนกัน */
+        .input-group { margin-bottom: 0 !important; display: block !important; }
+        .form-control { position: static !important; }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#5651FF]/5 rounded-full blur-[100px] pointer-events-none"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#5651FF]/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+    <div class="w-full flex justify-center p-6 relative z-50">
+        <div class="w-full max-w-md bg-white border border-gray-100 shadow-[0_20px_50px_rgba(0,0,0,0.04)] rounded-[2rem] overflow-hidden">
+            <div class="p-8 md:p-12">
+
+                <div class="text-center mb-10">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-[#5651FF] text-white rounded-2xl mb-5 shadow-lg shadow-[#5651FF]/20">
+                        <i class="fas fa-user-shield text-2xl"></i>
+                    </div>
+                    <h4 class="text-2xl font-bold text-[#1A1A1A] tracking-tight">ผู้ดูแลระบบ</h4>
+                    <p class="text-gray-400 text-sm mt-2 font-medium">Internal Admin Management</p>
+                </div>
+
+                {% if form.errors %}
+                <div class="flex items-center gap-3 p-4 text-sm rounded-2xl bg-red-50 text-red-600 mb-6">
+                    <i class="fas fa-circle-info"></i>
+                    <span class="font-medium">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</span>
+                </div>
+                {% endif %}
+
+                <form action="{{ app_path }}" method="post" id="login-form" class="space-y-6">
+                    {% csrf_token %}
+
+                    <div class="space-y-2">
+                        <label class="block px-1 text-sm font-semibold text-gray-600">ชื่อผู้ใช้งาน</label>
+                        <div class="relative flex items-center"> <span class="absolute left-4 z-20 text-gray-400 pointer-events-none">
+                                <i class="far fa-user text-sm"></i>
+                            </span>
+                            <input type="text" name="username" autofocus required
+                                class="block w-full h-12 pl-12 pr-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#5651FF] focus:ring-4 focus:ring-[#5651FF]/5 transition-all text-gray-900 shadow-sm !m-0 !p-0 !pl-12" 
+                                placeholder="Username" 
+                                style="position: relative !important;"> </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block px-1 text-sm font-semibold text-gray-600">รหัสผ่าน</label>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-4 z-20 text-gray-400 pointer-events-none">
+                                <i class="fas fa-key text-xs"></i>
+                            </span>
+                            <input type="password" name="password" required
+                                class="block w-full h-12 pl-12 pr-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#5651FF] focus:ring-4 focus:ring-[#5651FF]/5 transition-all text-gray-900 shadow-sm !m-0 !p-0 !pl-12" 
+                                placeholder="••••••••"
+                                style="position: relative !important;">
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full h-12 bg-[#5651FF] hover:bg-[#4843E6] rounded-xl text-white text-base font-bold shadow-md shadow-[#5651FF]/20 hover:shadow-lg active:scale-[0.98] transition-all duration-200 mt-4 flex items-center justify-center group">
+                        <span>เข้าสู่ระบบจัดการ</span>
+                        <i class="fas fa-sign-in-alt ml-2 group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </form>
+
+                <div class="mt-10 pt-6 border-t border-gray-50 text-center">
+                    <a href="/" class="text-xs font-bold text-gray-400 hover:text-[#5651FF] transition-colors inline-flex items-center gap-2">
+                         <i class="fas fa-arrow-left text-[10px]"></i> กลับสู่เว็บไซต์หลัก
+                    </a>
+                    <p class="mt-4 text-[10px] text-gray-300 uppercase tracking-widest font-medium">
+                        &copy; 2026 Autocode Grade Management
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+{% endblock %}

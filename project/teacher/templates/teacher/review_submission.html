@@ -3,109 +3,197 @@
 {% block title %}ตรวจงาน - {{ submission.student.name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container mx-auto px-4 py-8 max-w-screen-2xl">
+    <div class="mb-6">
+        <a href="{% url 'teacher:assignment_detail' pk=submission.assignment.pk %}" 
+           class="btn btn-ghost gap-2 text-gray-600 hover:bg-gray-100 border-none">
+            <i class="fas fa-arrow-left"></i>
+            กลับหน้ารายชื่อ
+        </a>
+    </div>
 
-    <a href="{% url 'teacher:assignment_detail' pk=submission.assignment.pk %}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-left me-2"></i> กลับหน้ารายชื่อ
-    </a>
-
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">งานของ: {{ submission.student.name }}</h5>
-                </div>
-                <div class="card-body">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <div class="lg:col-span-9 space-y-6">
+            <div class="card bg-white border border-gray-100 shadow-xl rounded-2xl overflow-hidden">
+                <div class="card-body p-6 sm:p-10">
+                    <div class="flex items-center justify-between mb-8">
+                        <h2 class="text-3xl font-black text-gray-800">งานของ: <span style="color: #5651FF;">{{ submission.student.name }}</span></h2>
+                        {% if submission.is_reported %}
+                        <div class="badge border-none gap-2 p-5 animate-pulse text-white font-bold" style="background-color: #D3302F;">
+                            <i class="fas fa-exclamation-triangle"></i> แจ้งปัญหา
+                        </div>
+                        {% endif %}
+                    </div>
 
                     {% if submission.is_reported %}
-                    <div class="alert alert-danger">
-                        <strong><i class="fas fa-flag"></i> นักเรียนแจ้งปัญหา:</strong> {{ submission.report_reason }}
+                    <div class="alert shadow-sm mb-8 rounded-xl border-none" style="background-color: rgba(211, 48, 47, 0.1); color: #D3302F;">
+                        <div class="flex flex-col items-start">
+                            <span class="font-bold flex items-center gap-2 text-lg">
+                                <i class="fas fa-flag"></i> นักเรียนแจ้งปัญหา:
+                            </span>
+                            <p class="mt-1 text-gray-700 text-lg">{{ submission.report_reason }}</p>
+                        </div>
                     </div>
                     {% endif %}
 
-                    <h6>📂 ไฟล์ที่ส่ง:</h6>
-                    {% for f in submission.files.all %}
-                    <a href="{{ f.file.url }}" target="_blank" class="btn btn-sm btn-outline-dark mb-2">{{ f.file.name
-                        }}</a>
-                    {% endfor %}
+                    <div class="mb-10">
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-5 flex items-center gap-2">
+                            <i class="fas fa-folder-open" style="color: #FF7E00;"></i> สิ่งที่นักเรียนส่ง
+                        </h4>
+                        
+                        <div class="flex flex-wrap gap-4">
+                            {% for f in submission.files.all %}
+                            <a href="{{ f.file.url }}" 
+                               download="{{ f.file.name }}"
+                               class="file-btn btn btn-outline rounded-xl px-6 border-gray-200 text-gray-600 transition-all duration-300">
+                                <i class="fas fa-file-download mr-2 text-lg"></i>
+                                <span>{{ f.file.name|truncatechars:30 }}</span>
+                            </a>
+                            {% endfor %}
 
-                    {% if submission.submitted_link %}
-                    <h6 class="mt-3">🔗 ลิงก์งาน:</h6>
-                    <a href="{{ submission.submitted_link }}" target="_blank" class="btn btn-outline-primary mb-3">
-                        <i class="fas fa-external-link-alt"></i> ไปที่ลิงก์งาน
-                    </a>
-                    {% endif %}
+                            {% if submission.submitted_link %}
+                            <a href="{{ submission.submitted_link }}" 
+                               target="_blank" 
+                               class="link-btn btn btn-outline rounded-xl px-6 border-blue-200 text-blue-600 transition-all duration-300">
+                                <i class="fas fa-external-link-alt mr-2 text-lg"></i>
+                                <span>เปิดลิ้งก์งาน</span>
+                            </a>
+                            {% endif %}
 
-                    <hr>
-
-                    <h6 class="text-info">🤖 AI Result (Score: {{ submission.ai_score }})</h6>
-                    <div class="bg-light p-3 border rounded">
-                        {{ submission.ai_feedback|safe }}
+                            {% if not submission.files.all and not submission.submitted_link %}
+                            <p class="text-gray-400 italic">ไม่มีข้อมูลการส่งงาน</p>
+                            {% endif %}
+                        </div>
                     </div>
 
-                    <hr>
+                    <div class="divider mb-10 opacity-50"></div>
 
-                    <h6 class="text-success">📝 Quiz Result</h6>
-                    {% if submission.quiz %}
-                    <div class="d-flex align-items-center">
-                        <span class="fs-5 fw-bold me-3">{{ submission.quiz.score }} / {{ submission.quiz.total_questions }} คะแนน</span>
-                        <a href="{% url 'teacher:quiz_result' submission.pk %}" target="_blank"
-                            class="btn btn-sm btn-outline-success">
-                            <i class="fas fa-list-ol me-1"></i> ดูคำตอบ
-                        </a>
+                    <div class="mb-10">
+                        <div class="flex items-center justify-between mb-6">
+                            <h4 class="text-xl font-bold flex items-center gap-2" style="color: #5651FF;">
+                                <i class="fas fa-robot"></i> AI Feedback
+                            </h4>
+                            <div class="badge badge-lg badge-outline font-bold px-6 py-4" style="color: #5651FF; border-color: #5651FF;">AI Score: {{ submission.ai_score }}</div>
+                        </div>
+                        <div class="p-8 rounded-3xl prose max-w-none text-gray-800 border border-blue-50 leading-relaxed text-lg" style="background-color: rgba(86, 81, 255, 0.03);">
+                            {{ submission.ai_feedback|safe }}
+                        </div>
                     </div>
-                    {% else %}
-                    <p class="text-muted">ไม่มีข้อมูล Quiz</p>
-                    {% endif %}
+
+                    <div class="p-8 rounded-3xl border" style="background-color: rgba(0, 150, 79, 0.04); border-color: rgba(0, 150, 79, 0.1);">
+                        <h4 class="text-xl font-bold mb-6 flex items-center gap-2" style="color: #00964F;">
+                            <i class="fas fa-tasks"></i> ผลคะแนน Quiz
+                        </h4>
+                        {% if submission.quiz %}
+                        <div class="flex items-center justify-between">
+                            <div class="text-3xl font-black text-gray-800">
+                                {{ submission.quiz.score }} <span class="text-lg font-normal text-gray-400">/ {{ submission.quiz.total_questions }} คะแนน</span>
+                            </div>
+                            <a href="{% url 'teacher:quiz_result' submission.pk %}" target="_blank"
+                               class="btn btn-md text-white rounded-xl px-8 border-none shadow-sm" style="background-color: #00964F;">
+                                <i class="fas fa-search-plus mr-2"></i> ดูคำตอบ
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card shadow border-primary sticky-top" style="top: 20px;">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-check-double me-2"></i>ตรวจงาน</h5>
-                </div>
-                <div class="card-body">
+        <div class="lg:col-span-3">
+            <div class="card bg-white shadow-2xl rounded-2xl sticky top-8 overflow-hidden border-t-8" style="border-top-color: #5651FF;">
+                <div class="card-body p-6">
+                    <h3 class="text-xl font-black text-gray-800 mb-6 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check" style="color: #5651FF;"></i> บันทึกการตรวจ
+                    </h3>
                     
-                    <form method="POST">
+                    <form method="POST" class="space-y-5">
                         {% csrf_token %}
-                        
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">คะแนน AI (แก้ไขได้):</label>
-                            {{ form.score }} 
-                            </div>
+                        <div class="form-control w-full">
+                            <label class="label pb-1"><span class="label-text font-bold text-gray-600 text-xs">คะแนนงาน</span></label>
+                            {{ form.score }}
+                        </div>
 
                         {% if submission.quiz %}
-                        <div class="mb-3 p-3 bg-success bg-opacity-10 rounded border border-success">
-                            <label class="form-label fw-bold text-success">
-                                <i class="fas fa-file-alt me-1"></i> คะแนน Quiz (แก้ไขได้):
+                        <div class="form-control w-full p-3 rounded-xl border" style="background-color: rgba(0, 150, 79, 0.03); border-color: rgba(0, 150, 79, 0.1);">
+                            <label class="label py-0 mb-1">
+                                <span class="label-text font-bold flex items-center gap-2 text-[10px]" style="color: #00964F;">
+                                    <i class="fas fa-edit"></i> คะแนน Quiz
+                                </span>
                             </label>
                             {{ form.quiz_score }}
-                            <div class="form-text text-muted small">
-                                *แก้ไขคะแนน Quiz ได้ที่นี่ ระบบจะรวมคะแนนใหม่อัตโนมัติ
-                            </div>
                         </div>
                         {% endif %}
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">ความเห็นอาจารย์:</label>
+                        <div class="form-control w-full">
+                            <label class="label pb-1"><span class="label-text font-bold text-gray-600 text-xs">ความเห็นอาจารย์</span></label>
                             {{ form.feedback }}
                         </div>
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" name="action" value="approve" class="btn btn-success">
-                                <i class="fas fa-check-circle me-2"></i>อนุมัติ (Pass)
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <button type="submit" name="action" value="approve" 
+                                    class="btn h-10 min-h-0 text-white rounded-xl shadow-md border-none hover:brightness-105 text-sm transition-all active:scale-95"
+                                    style="background-color: #00964F;">
+                                <i class="fas fa-check mr-1"></i> อนุมัติ
                             </button>
-                            <button type="submit" name="action" value="reject" class="btn btn-warning">
-                                <i class="fas fa-undo me-2"></i>ส่งคืนให้แก้ไข (Reject)
+                            
+                            <button type="submit" name="action" value="reject" 
+                                    class="btn h-10 min-h-0 text-white rounded-xl shadow-sm border-none hover:opacity-90 text-sm transition-all active:scale-95"
+                                    style="background-color: #FFB01D;">
+                                <i class="fas fa-undo mr-1"></i> ส่งคืน
                             </button>
                         </div>
                     </form>
-
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    /* Hover Effect สำหรับไฟล์ (สีส้ม FF7E00) */
+    .file-btn:hover {
+        background-color: #FF7E00 !important;
+        border-color: #FF7E00 !important;
+        color: white !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 126, 0, 0.2);
+    }
+
+    /* Hover Effect สำหรับลิ้งก์ (สีน้ำเงิน) */
+    .link-btn:hover {
+        background-color: #5651FF !important;
+        border-color: #5651FF !important;
+        color: white !important;
+        transform: translateY(-2px);
+    }
+
+    /* ตกแต่ง Input ให้กระชับขึ้น */
+    input[type="number"], input[type="text"] {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.95rem;
+        border-radius: 0.75rem;
+        border: 2px solid #f3f4f6;
+        background-color: #f9fafb;
+        transition: all 0.2s ease;
+    }
+    textarea {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+        border-radius: 0.75rem;
+        border: 2px solid #f3f4f6;
+        background-color: #f9fafb;
+        min-height: 120px;
+        transition: all 0.2s ease;
+    }
+    input:focus, textarea:focus {
+        border-color: #5651FF;
+        background-color: #fff;
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(86, 81, 255, 0.06);
+    }
+</style>
 {% endblock %}

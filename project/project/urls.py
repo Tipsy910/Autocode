@@ -26,6 +26,7 @@ urlpatterns = [
     path('accounts/', include('users.urls')),
     path('notifications/', include('notifications.urls')),
     path('', include('login.urls')),
+    path("__reload__/", include("django_browser_reload.urls"))
     
 ]
 

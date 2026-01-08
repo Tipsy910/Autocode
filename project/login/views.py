@@ -5,6 +5,7 @@ from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib import messages
 from django.shortcuts import render, redirect
 
+
 User = get_user_model()
 
 def login_view(request):

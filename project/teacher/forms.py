@@ -4,7 +4,14 @@ from room.models import Room, Assignment, Announcement
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
-        fields = ['name','cover_image']
+        fields = ['name', 'cover_image']
+        # เพิ่ม widgets เพื่อกำหนด class ของ Tailwind ให้กับแต่ละฟิลด์
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'w-full px-5 py-4 text-lg border-2 border-gray-200 focus:border-[#5651FF] focus:outline-none rounded-none transition-all',
+                'placeholder': 'กรอกชื่อห้องเรียน...',
+            }),
+        }
     
     def clean_name(self):
         name = self.cleaned_data.get('name')

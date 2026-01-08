@@ -403,13 +403,13 @@ def teacher_assignment_detail(request, pk):
                 stats['reported'] += 1
                 stats['pending'] += 1 # ถือว่าต้องรอครูเข้าไปดู
                 
-            # 2. กรณีผ่านแล้ว (Approved)
-            elif submission.status == 'PASSED':
+            # 2. กรณีผ่านแล้ว หรือเสร็จสมบูรณ์ (Approved / Completed)
+            elif submission.status in ['APPROVED', 'COMPLETED']:
                 display_status = 'PASSED'
                 stats['passed'] += 1
                 
             # 3. กรณีถูกส่งคืน (Reject/Revision)
-            elif submission.status == 'REJECT':
+            elif submission.status == 'REJECTED':
                 display_status = 'REJECT'
                 # ไม่นับเป็น pending หรือ passed เพราะถือว่าส่งกลับไปแล้ว
                 
@@ -446,16 +446,6 @@ def teacher_assignment_detail(request, pk):
         'assignment': assignment,
         'student_submissions': student_submissions,
         'stats': stats, # 👈 ส่งตัวแปรสถิติที่คำนวณใหม่ไปให้หน้าเว็บ
-    }
-    
-    return render(request, 'teacher/assignment_detail.html', context)
-    # เรียงลำดับ: เอาคนที่มีปัญหาขึ้นก่อน -> ตามด้วยคนที่ส่งแล้ว -> คนยังไม่ส่ง
-    # (Logic: REPORTED มาก่อนเพื่อน)
-    student_submissions.sort(key=lambda x: 0 if x['display_status'] == 'REPORTED' else 1)
-
-    context = {
-        'assignment': assignment,
-        'student_submissions': student_submissions
     }
     
     return render(request, 'teacher/assignment_detail.html', context)
@@ -656,7 +646,7 @@ def review_submission_view(request, pk):
             # 💾 CASE 3: บันทึกเฉยๆ (Save Draft / Update Score)
             # ========================================================
             else:
-                # ถ้าสถานะเดิมคือ PENDING ให้เปลี่ยนเป็น GRADED (AI ตรวจแล้ว/ครูตรวจแล้ว)
+                # ถ้าสถานะเดิมคือ PENDING ให้เปลี่ยนเป็น GRADED (AI ตรวจแล้ว)
                 if submission.status == 'PENDING':
                     submission.status = 'GRADED'
                 
@@ -726,7 +716,7 @@ def report_list_view(request, pk):
     reported_submissions = Submission.objects.filter(
         assignment=assignment, 
         is_reported=True
-    ).select_related('student')
+    ).select_related('student__student_profile')
 
     return render(request, 'teacher/report_list.html', {
         'assignment': assignment,

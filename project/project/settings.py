@@ -46,6 +46,9 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'login.apps.LoginConfig',
     'import_export',
+    'tailwind',
+    'theme', # ชื่อแอปที่เราจะสร้างเดี๋ยวนี้
+    'django_browser_reload',
     'teacher.apps.TeacherConfig',
     'room.apps.RoomConfig',
     'student.apps.StudentConfig',
@@ -55,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "django_browser_reload.middleware.BrowserReloadMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -168,48 +172,63 @@ BASE_URL = 'http://127.0.0.1:8000'
 
 
 JAZZMIN_SETTINGS = {
-    # 1. ตั้งชื่อระบบให้ดูโปร
+    # 1. ตั้งชื่อระบบ
     "site_title": "Classroom Admin",
     "site_header": "ระบบจัดการห้องเรียน",
     "site_brand": "Autocode Grade",
     "welcome_sign": "ยินดีต้อนรับสู่ระบบจัดการการเรียนการสอน",
     "copyright": "Autocode Grade",
 
-    # 2. จัดลำดับแอป (เอา Room ขึ้นก่อน Users)
+    # --- ส่วนสำคัญสำหรับการใช้ Custom CSS ---
+    # ชี้ไปยังไฟล์ CSS ที่คุณจะสร้าง (สมมติว่าอยู่ที่ static/admin/css/custom_admin.css)
+
+    # ---------------------------------------
+
+    # 2. จัดลำดับแอป
     "order_with_respect_to": [
-        "room",            # เอาแอป Room (ห้องเรียน/งาน) ขึ้นก่อน
-        "users",           # ตามด้วย Users (นักเรียน/อาจารย์)
-        "auth",            # ระบบจัดการสิทธิ์ไว้ล่างสุด
+        "room",
+        "users",
+        "auth",
     ],
 
-    # 3. ใส่ไอคอนสวยๆ (ใช้ FontAwesome Free)
+    # 3. ใส่ไอคอน
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
-        
-        # App: Users
-        "users.Students": "fas fa-user-graduate", # 🎓 รูปนักเรียนรับปริญญา
-        "users.Teachers": "fas fa-chalkboard-teacher", # 👨‍🏫 รูปครูหน้ากระดาน
+        "users.Students": "fas fa-user-graduate",
+        "users.Teachers": "fas fa-chalkboard-teacher",
         "users.Users": "fas fa-id-card",
-        
-        # App: Room
-        "room.Room": "fas fa-school",             # 🏫 รูปโรงเรียน
-        "room.Assignment": "fas fa-book-open",    # 📖 รูปหนังสือเปิด
-        "room.SubmissionType": "fas fa-file-code", # 📄 รูปไฟล์โค้ด
+        "room.Room": "fas fa-school",
+        "room.Assignment": "fas fa-book-open",
+        "room.SubmissionType": "fas fa-file-code",
     },
 
-    # 4. เมนู Top bar (ทางลัด)
+    # 4. เมนู Top bar
     "topmenu_links": [
         {"name": "Home",  "url": "admin:index", "permissions": ["auth.view_user"]},
-        {"name": "ดูหน้าเว็บจริง (View Site)", "url": "/", "new_window": True}, # ลิงก์ไปหน้าเว็บหลัก
+        {"name": "ดูหน้าเว็บจริง (View Site)", "url": "/", "new_window": True},
     ],
 
-    # 5. เปิดระบบค้นหาแบบ Global (ค้นหาทีเดียวเจอทั้งนักเรียนและห้องเรียน)
+    # 5. ระบบค้นหาแบบ Global
     "search_model": ["users.Students", "room.Room", "room.Assignment"],
 
-    # UI Customizer (ปิดไว้ตอนใช้งานจริง)
-    "show_ui_builder": True,
+    # UI Customizer
+    "show_ui_builder": False,  # ปรับเป็น False เมื่อตกแต่งเสร็จแล้ว
+    
+    # 6. ตั้งค่าการแสดงผลเมนูข้าง (ทำให้ดูโปรขึ้น)
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": [],
+    "hide_models": [],
+    "changeform_format": "horizontal_tabs", # แยกฟิลด์ในหน้าแก้ไขเป็น Tab ทำให้ดูง่าย
 }
-
 # Jazzmin UI Tweaks (ปรับสีและธีม)
+
+TAILWIND_APP_NAME = 'theme'
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
+
+NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"

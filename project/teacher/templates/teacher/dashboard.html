@@ -4,138 +4,289 @@
 {% block title %}Dashboard - {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-        <h1 class="h3 mb-0 me-3">ห้องเรียนของฉัน</h1>
-        <div class="d-flex mt-2 mt-md-0">
-            <button type="button" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#joinRoomModal">
-                <i class="fas fa-sign-in-alt me-2"></i>เข้าร่วมห้องเรียน
+<style>
+    /* --- Custom Colors --- */
+    .btn-teacher-primary {
+        background-color: #5651FF;
+        color: white;
+        border: none;
+    }
+    .btn-teacher-primary:hover {
+        background-color: #4b46e5; /* Darker Primary */
+        box-shadow: 0 4px 12px rgba(86, 81, 255, 0.4);
+    }
+
+    .btn-teacher-secondary {
+        background-color: #FF7E00;
+        color: white;
+        border: none;
+    }
+    .btn-teacher-secondary:hover {
+        background-color: #e56f00; /* Darker Orange */
+        box-shadow: 0 4px 12px rgba(255, 126, 0, 0.4);
+    }
+
+    /* --- Input Styles --- */
+    .input-modern {
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        transition: all 0.3s ease;
+    }
+    .input-modern:focus {
+        background-color: #fff;
+        border-color: #5651FF;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(86, 81, 255, 0.1);
+    }
+
+    /* Modern Code Input (For Join Room) */
+    .input-code-modern {
+        background-color: #f9fafb;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    .input-code-modern:focus {
+        background-color: #fff;
+        border-color: #FF7E00;
+        box-shadow: 0 0 0 4px rgba(255, 126, 0, 0.1);
+        outline: none;
+    }
+</style>
+
+<div class="container mx-auto my-8 px-4">
+
+    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <h3 class="text-3xl font-bold text-gray-800">ห้องเรียนของฉัน</h3>
+
+        <div class="flex gap-3">
+            <button class="btn btn-teacher-secondary shadow-md rounded-full px-6" onclick="join_room_modal.showModal()">
+                <i class="fas fa-sign-in-alt mr-2"></i> เข้าร่วมห้องเรียน
             </button>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoomModal">
-                <i class="fas fa-plus me-2"></i>สร้างห้องเรียนใหม่
+
+            <button class="btn btn-teacher-primary shadow-md rounded-full px-6" onclick="create_room_modal.showModal()">
+                <i class="fas fa-plus mr-2"></i> สร้างห้องเรียนใหม่
             </button>
         </div>
     </div>
 
     {% if all_rooms %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            {% for room in all_rooms %}
-            <div class="col">
-                <div class="card h-100 shadow-sm">
-                    <a href="{% url 'room:teacher_detail' room.pk %}" class="text-decoration-none text-dark">
-                        {% if room.cover_image %}
-                            <img src="{{ room.cover_image.url }}" class="card-img-top" alt="{{ room.name }}" style="height: 140px; object-fit: cover;">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for room in all_rooms %}
+        <a href="{% url 'room:teacher_detail' room.pk %}" class="group block h-full">
+            <div class="card bg-white shadow-md hover:shadow-xl transition-all duration-300 h-full border border-gray-100 overflow-hidden hover:-translate-y-1 rounded-2xl">
+                
+                <figure class="h-40 w-full relative bg-gray-50">
+                    {% if room.cover_image %}
+                    <img src="{{ room.cover_image.url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt="{{ room.name }}">
+                    {% else %}
+                    <div class="flex items-center justify-center w-full h-full text-gray-300">
+                        <i class="fas fa-image text-4xl opacity-50"></i>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="absolute top-3 right-3 z-10">
+                        {% if room.owner == request.user %}
+                        <div class="badge h-7 px-4 rounded-full bg-[#5651FF] text-white border-none shadow-md shadow-[#5651FF]/20 text-[11px] font-bold flex items-center gap-1.5 tracking-wide">
+                            <i class="fas fa-crown text-[9px]"></i>
+                            <span>เจ้าของ</span>
+                        </div>
                         {% else %}
-                            <div class="card-img-top bg-light border-bottom d-flex align-items-center justify-content-center text-muted" style="height: 140px;">
-                                <i class="fas fa-image fa-3x"></i>
-                            </div>
+                        <div class="badge h-7 px-4 rounded-full bg-[#FF7E00] text-white border-none shadow-md shadow-[#FF7E00]/20 text-[11px] font-bold flex items-center gap-1.5 tracking-wide">
+                            <i class="fas fa-user-friends text-[9px]"></i>
+                            <span>ผู้สอนร่วม</span>
+                        </div>
                         {% endif %}
-                        <div class="card-body">
-                            <h5 class="card-title text-truncate">{{ room.name }}</h5>
-                            <p class="card-text text-muted small">สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</p>
-                        </div>
-                    </a>
-                    <div class="card-footer bg-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">รหัสเชิญ: <strong>{{ room.invite_code }}</strong></small>
-                            {% if room.owner == request.user %}
-                                <span class="badge bg-primary">เจ้าของ</span>
-                            {% else %}
-                                <span class="badge bg-secondary">ผู้สอนร่วม</span>
-                            {% endif %}
-                        </div>
+                    </div>
+                </figure>
+
+                <div class="p-5 flex flex-col gap-1 bg-white flex-grow">
+                    <h2 class="text-lg font-bold text-gray-900 line-clamp-1 group-hover:text-[#5651FF] transition-colors">
+                        {{ room.name }}
+                    </h2>
+                    
+                    <div class="flex items-center gap-2 text-sm text-gray-500 mt-1 mb-3">
+                        <i class="fas fa-user-tie text-xs opacity-70"></i>
+                        <span class="truncate font-medium opacity-80">
+                            {{ room.owner.get_full_name|default:room.owner.email }}
+                        </span>
+                    </div>
+
+                    <div class="h-px bg-gray-100 w-full my-1"></div>
+
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs text-gray-400 font-medium">รหัสเชิญ</span>
+                        <span class="text-sm font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded tracking-wider">
+                            {{ room.invite_code }}
+                        </span>
                     </div>
                 </div>
             </div>
-            {% endfor %}
-        </div>
+        </a>
+        {% endfor %}
+    </div>
     {% else %}
-        <div class="card shadow-sm">
-            <div class="card-body text-center py-5">
-                <h4 class="text-muted">ยังไม่มีห้องเรียน</h4>
-                <p class="text-muted">คลิก "สร้างห้องเรียนใหม่" หรือ "เข้าร่วมห้องเรียน" เพื่อเริ่มได้เลย!</p>
-            </div>
+    <div class="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-center">
+        <div class="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-gray-300">
+            <i class="fas fa-chalkboard text-3xl"></i>
         </div>
+        <h3 class="text-xl font-bold text-gray-700">ยังไม่มีห้องเรียน</h3>
+        <p class="text-gray-500 mt-2 mb-6 max-w-sm">เริ่มสร้างห้องเรียนของคุณเพื่อจัดการเรียนการสอน หรือเข้าร่วมทีมผู้สอนอื่น</p>
+        <div class="flex gap-3">
+            <button class="btn btn-sm btn-ghost text-[#FF7E00]" onclick="join_room_modal.showModal()">เข้าร่วม</button>
+            <button class="btn btn-sm btn-ghost text-[#5651FF]" onclick="create_room_modal.showModal()">สร้างใหม่</button>
+        </div>
+    </div>
     {% endif %}
 </div>
 
-<div class="modal fade" id="createRoomModal" tabindex="-1" aria-labelledby="createRoomModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form action="{% url 'teacher:dashboard' %}" method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="createRoomModalLabel">สร้างห้องเรียนใหม่</h1>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="{{ create_form.name.id_for_label }}" class="form-label">ชื่อห้องเรียน:</label>
-                        <input type="text" name="{{ create_form.name.name }}" id="{{ create_form.name.id_for_label }}" class="form-control {% if create_form.name.errors %}is-invalid{% endif %}" placeholder="เช่น ห้องเรียนวิทยาศาสตร์ ม.4/1" required>
-                        {% for error in create_form.name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                    </div>
-                    <div class="mb-3">
-                        <label for="{{ create_form.cover_image.id_for_label }}" class="form-label">รูปปกห้องเรียน (ถ้ามี):</label>
-                        <input type="file" name="{{ create_form.cover_image.name }}" accept="image/*" id="{{ create_form.cover_image.id_for_label }}" class="form-control {% if create_form.cover_image.errors %}is-invalid{% endif %}">
-                        {% for error in create_form.cover_image.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary" name="action" value="create_room">ยืนยันและสร้างห้อง</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<dialog id="create_room_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white p-8 w-full max-w-lg shadow-2xl relative rounded-none">
+        
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 text-gray-400 hover:text-gray-600 focus:outline-none">
+                <i class="fas fa-times"></i>
+            </button>
+        </form>
 
-<div class="modal fade" id="joinRoomModal" tabindex="-1" aria-labelledby="joinRoomModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="post" action="{% url 'teacher:dashboard' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="joinRoomModalLabel">เข้าร่วมห้องเรียน</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h3 class="text-2xl font-bold text-[#5651FF] mb-2 flex items-center gap-2">
+            <i class="fas fa-plus-square"></i> สร้างห้องเรียนใหม่
+        </h3>
+        <p class="text-gray-500 text-sm mb-6">กรอกข้อมูลเพื่อสร้างห้องเรียนสำหรับการสอนของคุณ</p>
+
+        <form action="{% url 'teacher:dashboard' %}" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_room">
+
+            <div class="flex flex-col gap-6">
+                <div class="form-control">
+                    <label class="label pt-0"><span class="label-text font-bold text-gray-700">ชื่อห้องเรียน</span></label>
+                    <input type="text" name="{{ create_form.name.name }}" id="{{ create_form.name.id_for_label }}" 
+                        class="input input-bordered w-full rounded-none focus:border-[#5651FF] focus:outline-none bg-gray-50 h-12" 
+                        placeholder="เช่น วิทยาศาสตร์ ม.4/1" required>
+                    {% if create_form.name.errors %}
+                        <span class="text-red-500 text-xs mt-1">{{ create_form.name.errors.0 }}</span>
+                    {% endif %}
                 </div>
-                <div class="modal-body">
-                    <p>กรุณากรอกรหัสเชิญ (Invite Code) ที่ได้รับจากผู้สอน</p>
-                    <div class="mb-3">
-                        <label for="{{ join_form.code.id_for_label }}" class="form-label">{{ join_form.code.label }}</label>
-                        <input type="text" name="{{ join_form.code.name }}" class="form-control {% if join_form.code.errors %}is-invalid{% endif %}" id="{{ join_form.code.id_for_label }}" maxlength="6" style="text-transform:uppercase">
-                        {% for error in join_form.code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text font-bold text-gray-700">รูปปกห้องเรียน (ถ้ามี)</span></label>
+                    
+                    <div class="relative w-full group">
+                        <input type="file" name="{{ create_form.cover_image.name }}" id="{{ create_form.cover_image.id_for_label }}" 
+                            accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            onchange="updateFileName(this)">
+                        
+                        <div class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-indigo-50 hover:border-[#5651FF] transition-all duration-300" id="upload-box-style">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6 text-gray-400 group-hover:text-[#5651FF]">
+                                <i class="fas fa-cloud-upload-alt text-3xl mb-2"></i>
+                                <p class="mb-1 text-sm"><span class="font-semibold">คลิกเพื่ออัปโหลดรูปภาพ</span></p>
+                                <p class="text-xs text-gray-400" id="file-name-display">PNG, JPG หรือ GIF (สูงสุด 5MB)</p>
+                            </div>
+                        </div>
                     </div>
+
+                    {% if create_form.cover_image.errors %}
+                        <span class="text-red-500 text-xs mt-1">{{ create_form.cover_image.errors.0 }}</span>
+                    {% endif %}
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary" name="action" value="join_room">เข้าร่วม</button>
+            </div>
+
+            <div class="mt-8">
+                <button type="submit" class="btn btn-teacher-primary w-full rounded-none h-12 text-lg shadow-lg shadow-indigo-200">
+                    ยืนยันและสร้างห้อง
+                </button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<dialog id="join_room_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white p-0 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden relative">
+        
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 text-gray-400 hover:text-gray-600 z-10 focus:outline-none">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </form>
+
+        <div class="px-8 pt-10 pb-8 text-center">
+            <div class="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FF7E00]">
+                <i class="fas fa-sign-in-alt text-2xl"></i>
+            </div>
+
+            <h3 class="text-2xl font-bold text-gray-800">เข้าร่วมทีมผู้สอน</h3>
+            <p class="text-gray-400 text-sm mt-2">กรอกรหัสเชิญเพื่อเข้าร่วมเป็นผู้สอนร่วมในห้องเรียน</p>
+
+            <form method="post" action="{% url 'teacher:dashboard' %}" class="mt-8">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="join_room">
+
+                <div class="form-control w-full relative">
+                    <input type="text" name="{{ join_form.code.name }}" id="{{ join_form.code.id_for_label }}"
+                        class="input-code-modern w-full text-center text-4xl font-bold text-gray-700 h-20 rounded-2xl tracking-[0.5em] placeholder:text-gray-200 placeholder:tracking-normal uppercase"
+                        placeholder="CODE" maxlength="6" required autocomplete="off">
+                </div>
+
+                {% if join_form.code.errors %}
+                <div class="mt-4 p-3 bg-red-50 text-red-500 text-sm rounded-xl flex items-center justify-center gap-2">
+                    <i class="fas fa-exclamation-circle"></i>
+                    {% for error in join_form.code.errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="mt-8">
+                    <button type="submit" class="btn btn-teacher-secondary w-full text-lg rounded-xl h-12 font-bold shadow-lg shadow-orange-100">
+                        เข้าร่วม
+                    </button>
                 </div>
             </form>
         </div>
     </div>
-</div>
+</dialog>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. เช็คว่า Create Form มี Error ส่งกลับมาไหม
+        // 1. เช็ค Error สำหรับ Create Room Modal
         {% if create_form.errors %}
-            var createModalEl = document.getElementById('createRoomModal');
-            if (createModalEl) {
-                var createModal = new bootstrap.Modal(createModalEl);
-                createModal.show();
+            const createModal = document.getElementById('create_room_modal');
+            if (createModal) {
+                createModal.showModal();
             }
         {% endif %}
 
-        // 2. เช็คว่า Join Form มี Error ส่งกลับมาไหม
+        // 2. เช็ค Error สำหรับ Join Room Modal
         {% if join_form.errors %}
-            var joinModalEl = document.getElementById('joinRoomModal');
-            if (joinModalEl) {
-                var joinModal = new bootstrap.Modal(joinModalEl);
-                joinModal.show();
+            const joinModal = document.getElementById('join_room_modal');
+            if (joinModal) {
+                joinModal.showModal();
             }
         {% endif %}
     });
+
+    function updateFileName(input) {
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const uploadBox = document.getElementById('upload-box-style');
+        
+        if (input.files && input.files[0]) {
+            // เปลี่ยนข้อความบอกชื่อไฟล์
+            fileNameDisplay.textContent = "เลือกไฟล์: " + input.files[0].name;
+            fileNameDisplay.className = "text-sm font-bold text-[#5651FF] mt-2";
+            
+            // เปลี่ยนสีกรอบให้รู้ว่าเลือกแล้ว
+            uploadBox.classList.add('border-[#5651FF]', 'bg-indigo-50');
+            uploadBox.classList.remove('border-gray-300', 'bg-gray-50');
+        } else {
+            // Reset กลับถ้าไม่ได้เลือก
+            fileNameDisplay.textContent = "PNG, JPG หรือ GIF (สูงสุด 5MB)";
+            fileNameDisplay.className = "text-xs text-gray-400";
+            
+            uploadBox.classList.remove('border-[#5651FF]', 'bg-indigo-50');
+            uploadBox.classList.add('border-gray-300', 'bg-gray-50');
+        }
+    }
 </script>
 
 {% endblock %}
-

@@ -1,70 +1,107 @@
 {% extends "admin/index.html" %}
-{% load dashboard_stats %} {% block content %}
+{% load dashboard_stats %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* 1. คุมโทน Font และพื้นหลัง */
+        body, .content-wrapper { 
+            font-family: 'Kanit', sans-serif !important; 
+            background-color: #f4f6f9 !important; 
+        }
+
+        /* 2. แต่ง Card ให้ดู "ลอย" และ "มน" (สไตล์ที่คุณต้องการ) */
+        .custom-stat-card {
+            background: #fff;
+            border-radius: 1.5rem !important; /* มนพิเศษ */
+            border: none !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important; /* เงาฟุ้งๆ ดูแพง */
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        
+        .custom-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+        }
+
+        /* 3. จัดการ Icon ให้ดู Modern */
+        .icon-box {
+            width: 55px;
+            height: 55px;
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            font-size: 1.5rem;
+        }
+
+        /* 4. สีประจำหมวด (ดึงมาจาก Code สีที่คุณให้มา) */
+        .bg-blue-soft { background-color: #eef2ff; color: #5651FF; }
+        .bg-green-soft { background-color: #ecfdf5; color: #10b981; }
+        .bg-orange-soft { background-color: #fff7ed; color: #FF920D; }
+        .bg-red-soft { background-color: #fef2f2; color: #ef4444; }
+
+        .stat-label { color: #8e8e8e; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { color: #1a1a1a; font-size: 1.75rem; font-weight: 800; line-height: 1; }
+    </style>
+{% endblock %}
+
+{% block content %}
     {% get_summary_stats as stats %}
 
-    <div class="row" style="margin-bottom: 20px;">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="custom-stat-card">
+                    <div class="icon-box bg-blue-soft"><i class="fas fa-user-graduate"></i></div>
+                    <div>
+                        <div class="stat-label">Students</div>
+                        <div class="stat-value">{{ stats.students }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="custom-stat-card">
+                    <div class="icon-box bg-green-soft"><i class="fas fa-chalkboard-teacher"></i></div>
+                    <div>
+                        <div class="stat-label">Teachers</div>
+                        <div class="stat-value">{{ stats.teachers }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="custom-stat-card" style="border: 2px solid #5651FF1a !important;">
+                    <div class="icon-box" style="background-color: #5651FF; color: white;"><i class="fas fa-school"></i></div>
+                    <div>
+                        <div class="stat-label" style="color: #5651FF;">Active Rooms</div>
+                        <div class="stat-value">{{ stats.rooms }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="custom-stat-card">
+                    <div class="icon-box bg-red-soft"><i class="fas fa-book"></i></div>
+                    <div>
+                        <div class="stat-label">Assignments</div>
+                        <div class="stat-value">{{ stats.assignments }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
-        <div class="col-lg-3 col-6">
-            <div class="small-box bg-info">
-                <div class="inner">
-                    <h3>{{ stats.students }}</h3>
-                    <p>นักเรียนทั้งหมด (Students)</p>
-                </div>
-                <div class="icon">
-                    <i class="fas fa-user-graduate"></i>
-                </div>
-                <a href="/admin/users/students/" class="small-box-footer">
-                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
-                </a>
+        <div class="row">
+            <div class="col-12">
+                {{ block.super }}
             </div>
         </div>
-
-        <div class="col-lg-3 col-6">
-            <div class="small-box bg-success">
-                <div class="inner">
-                    <h3>{{ stats.teachers }}</h3>
-                    <p>อาจารย์ (Teachers)</p>
-                </div>
-                <div class="icon">
-                    <i class="fas fa-chalkboard-teacher"></i>
-                </div>
-                <a href="/admin/users/teachers/" class="small-box-footer">
-                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
-                </a>
-            </div>
-        </div>
-
-        <div class="col-lg-3 col-6">
-            <div class="small-box bg-warning">
-                <div class="inner">
-                    <h3>{{ stats.rooms }}</h3>
-                    <p>ห้องเรียน (Active Rooms)</p>
-                </div>
-                <div class="icon">
-                    <i class="fas fa-school"></i>
-                </div>
-                <a href="/admin/room/room/" class="small-box-footer">
-                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
-                </a>
-            </div>
-        </div>
-
-        <div class="col-lg-3 col-6">
-            <div class="small-box bg-danger">
-                <div class="inner">
-                    <h3>{{ stats.assignments }}</h3>
-                    <p>งานทั้งหมด (Assignments)</p>
-                </div>
-                <div class="icon">
-                    <i class="fas fa-book"></i>
-                </div>
-                <a href="/admin/room/assignment/" class="small-box-footer">
-                    ดูข้อมูล <i class="fas fa-arrow-circle-right"></i>
-                </a>
-            </div>
-        </div>
-
     </div>
-
-    {{ block.super }}
 {% endblock %}

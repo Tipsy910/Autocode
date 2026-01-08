@@ -4,309 +4,769 @@
 {% block title %}{{ room.name }} (Teacher) - {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4 mb-5">
+<style>
+    /* Custom Tab Styling */
+    .tab-btn {
+        transition: all 0.3s ease;
+    }
 
-    <div class="p-5 mb-4 rounded-3 shadow-sm position-relative" style="background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url({% if room.cover_image %}{{ room.cover_image.url }}{% else %}{% static 'img/default_cover.jpg' %}{% endif %}); background-size: cover; background-position: center; color: white;">
-        {% if room.owner == request.user %}
-        <div class="position-absolute top-0 end-0 p-3">
-            <div class="dropdown">
-                <button class="btn btn-outline-light" type="button" id="roomSettingsDropdown" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-cog"></i></button>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="roomSettingsDropdown">
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editRoomModal"><i class="fas fa-edit me-2"></i>แก้ไขข้อมูล</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteRoomModal"><i class="fas fa-trash-alt me-2"></i>ลบห้องเรียน</a></li>
-                </ul>
+    .tab-btn.active {
+        color: #5651FF;
+        border-bottom: 3px solid #5651FF;
+        font-weight: 700;
+    }
+
+    .tab-content-pane {
+        display: none;
+    }
+
+    .tab-content-pane.active {
+        display: block;
+    }
+
+    /* Dropdown Styling - Match Navbar */
+    details>summary {
+        list-style: none;
+    }
+
+    details>summary::-webkit-details-marker {
+        display: none;
+    }
+
+    /* Dropdown content styling - absolute position to prevent layout shift */
+    .dropdown {
+        position: relative;
+    }
+
+    .dropdown-content {
+        position: absolute;
+        box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.2);
+        border: 1px solid #f0f0f0;
+        z-index: 9999;
+    }
+
+    /* Dropdown end - position on the right */
+    .dropdown-end>.dropdown-content {
+        right: 0;
+        left: auto;
+    }
+</style>
+
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+
+    <!-- Room Header - Split Design -->
+    <div class="bg-white rounded-3xl overflow-hidden shadow-xl mb-8">
+        <!-- Top: Cover Image Section -->
+        <div class="relative h-64 bg-gradient-to-br from-gray-700 to-gray-900 {% if room.cover_image %}bg-cover bg-center{% endif %}"
+            style="{% if room.cover_image %}background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('{{ room.cover_image.url }}');{% endif %}">
+
+            <!-- Settings Dropdown (Only for Owner) -->
+            {% if room.owner == request.user %}
+            <div class="absolute top-6 right-6 z-20">
+                <details class="dropdown dropdown-end group">
+                    <summary tabindex="0"
+                        class="list-none cursor-pointer flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white transition-all duration-300 group-open:rotate-90 outline-none focus:outline-none focus:ring-0 active:scale-90 border border-white/20">
+                        <i class="fas fa-ellipsis-v text-lg"></i>
+                    </summary>
+                    
+                    <ul tabindex="0"
+                        class="dropdown-content menu p-3 shadow-[0_20px_50px_rgba(0,0,0,0.1)] bg-white/95 backdrop-blur-sm rounded-[1.5rem] w-64 mt-4 border border-white/20 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                        
+                        <div class="px-4 pt-2 pb-3">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">การจัดการห้องเรียน</p>
+                        </div>
+
+                        <li>
+                            <a onclick="editRoomModal.showModal(); this.closest('details').removeAttribute('open');"
+                                class="flex items-center gap-3 p-3 text-gray-700 hover:bg-[#5651FF]/5 hover:text-[#5651FF] rounded-2xl transition-all group/item">
+                                <div class="w-10 h-10 rounded-xl bg-[#5651FF]/10 flex items-center justify-center group-hover/item:bg-[#5651FF] group-hover/item:text-white transition-all">
+                                    <i class="fas fa-edit text-sm"></i>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="font-bold text-sm">แก้ไขข้อมูล</span>
+                                    <span class="text-[10px] text-gray-400">ชื่อห้อง, คำอธิบาย, รูปหน้าปก</span>
+                                </div>
+                            </a>
+                        </li>
+
+                        <div class="divider my-2 opacity-50 px-4"></div>
+
+                        <li>
+                            <a onclick="deleteRoomModal.showModal(); this.closest('details').removeAttribute('open');"
+                                class="flex items-center gap-3 p-3 text-red-500 hover:bg-red-50 rounded-2xl transition-all group/delete">
+                                <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center group-hover/delete:bg-red-500 group-hover/delete:text-white transition-all">
+                                    <i class="fas fa-trash-alt text-sm"></i>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="font-bold text-sm">ลบห้องเรียน</span>
+                                    <span class="text-[10px] text-red-400">ลบข้อมูลทั้งหมดอย่างถาวร</span>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </details>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
-        <div class="container-fluid py-3">
-            <h1 class="display-5 fw-bold">{{ room.name }}</h1>
-            <p class="fs-5">สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</p>
-            <p class="mt-3"><span class="badge bg-light text-dark fs-6">รหัสเชิญ: {{ room.invite_code }}</span></p>
+
+        <!-- Bottom: Room Details Section -->
+        <div class="p-6 md:p-8 bg-white">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">{{ room.name }}</h1>
+            <p class="text-gray-600 mb-4 flex items-center gap-2">
+                <i class="fas fa-user-tie text-gray-400"></i>
+                <span>สอนโดย: {{ room.owner.get_full_name|default:room.owner.email }}</span>
+            </p>
+            <div class="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200">
+                <i class="fas fa-key text-gray-500"></i>
+                <span class="text-gray-700 font-bold tracking-wider">รหัสเชิญ: {{ room.invite_code }}</span>
+            </div>
         </div>
     </div>
 
-    <ul class="nav nav-tabs nav-fill mb-4" id="roomTab" role="tablist">
-        <li class="nav-item" role="presentation"><button class="nav-link active" id="stream-tab" data-bs-toggle="tab" data-bs-target="#stream-tab-pane" type="button"><i class="fas fa-stream me-2"></i>กระดานสนทนา</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments-tab-pane" type="button"><i class="fas fa-tasks me-2"></i>งานของชั้นเรียน</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="people-tab" data-bs-toggle="tab" data-bs-target="#people-tab-pane" type="button"><i class="fas fa-users me-2"></i>ผู้คน</button></li>
-    </ul>
+    <!-- Tab Navigation -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+        <div class="flex border-b border-gray-100">
+            <button
+                class="tab-btn active flex-1 py-4 px-6 text-center font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                data-tab="stream">
+                <i class="fas fa-stream mr-2"></i> กระดานสนทนา
+            </button>
+            <button
+                class="tab-btn flex-1 py-4 px-6 text-center font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                data-tab="assignments">
+                <i class="fas fa-tasks mr-2"></i> งานของชั้นเรียน
+            </button>
+            <button
+                class="tab-btn flex-1 py-4 px-6 text-center font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                data-tab="people">
+                <i class="fas fa-users mr-2"></i> ผู้คน
+            </button>
+        </div>
+    </div>
 
-    <div class="tab-content" id="roomTabContent">
+    <!-- Tab Content Container -->
+    <div id="tabContentContainer">
 
-        <div class="tab-pane fade show active" id="stream-tab-pane" role="tabpanel">
-            <div class="card mb-4 shadow-sm">
-                <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" action="{% url 'room:teacher_detail' pk=room.pk %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="post_announcement">
-                        <div class="mb-3">{{ announcement_form.content }}</div>
-                        <div class="mb-3">
-                            <label for="id_attached_files" class="form-label">แนบไฟล์ (เลือกได้หลายไฟล์)</label>
-                            <div class="input-group">
-                                <input type="file" name="attached_files" class="form-control" id="id_attached_files" multiple>
-                                <button class="btn btn-outline-danger" type="button" onclick="document.getElementById('id_attached_files').value = ''"><i class="fas fa-times me-1"></i> ล้างค่า</button>
-                            </div>
-                        </div>
-                        <div class="text-end"><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-2"></i>โพสต์</button></div>
-                    </form>
+        <!-- Stream Tab (Announcements) -->
+        <div class="tab-content-pane active" id="stream-pane">
+            <!-- Create Announcement Form -->
+            <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-6">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fas fa-bullhorn text-[#5651FF]"></i>
+                        ประกาศหรือข้อความถึงห้องเรียน
+                    </h3>
                 </div>
-            </div>
-            
-            {% for announcement in announcements %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="card-title mb-1"><i class="fas fa-bullhorn text-primary me-2"></i> ประกาศโดย {{ announcement.author.get_full_name|default:announcement.author.email }}</h5>
-                        <div class="d-flex align-items-center">
-                            <small class="text-muted me-3">{{ announcement.created_at|date:"d M Y, H:i" }}</small>
-                            {% if announcement.author == request.user %}
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v"></i></button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    
-                                    <li><a class="dropdown-item btn-edit-announcement" href="#" 
-                                           data-bs-toggle="modal" 
-                                           data-bs-target="#globalEditAnnouncementModal"
-                                           data-id="{{ announcement.pk }}"
-                                           data-action-url="{% url 'teacher:announcement_edit' pk=announcement.pk %}"
-                                           >
-                                        <i class="fas fa-edit me-2"></i>แก้ไข
-                                    </a></li>
 
-                                    <li><a class="dropdown-item text-danger btn-delete-announcement" href="#" 
-                                           data-bs-toggle="modal" 
-                                           data-bs-target="#globalDeleteAnnouncementModal"
-                                           data-action-url="{% url 'teacher:announcement_delete' pk=announcement.pk %}"
-                                           data-preview-text="{{ announcement.content|truncatewords:10 }}"
-                                           >
-                                        <i class="fas fa-trash-alt me-2"></i>ลบ
-                                    </a></li>
-                                </ul>
+                <form method="POST" enctype="multipart/form-data" action="{% url 'room:teacher_detail' pk=room.pk %}"
+                    class="p-6">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="post_announcement">
+
+                    <div class="mb-5">
+                        <textarea name="content" rows="4"
+                            class="textarea textarea-bordered w-full bg-gray-50 border-gray-200 focus:border-[#5651FF] focus:outline-none focus:ring-2 focus:ring-[#5651FF]/20 rounded-xl text-gray-700 resize-none"
+                            placeholder="พิมพ์ข้อความของคุณที่นี่..." required></textarea>
+                    </div>
+                    <div class="mb-5">
+                        <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-paperclip text-[#5651FF]"></i>
+                            แนบไฟล์ประกอบประกาศ
+                        </label>
+                        
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <label for="id_attached_files" 
+                                    class="flex items-center justify-between w-full px-4 py-3 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-indigo-50 hover:border-[#5651FF]/50 transition-all group">
+                                    
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                            <i class="fas fa-cloud-upload-alt text-[#5651FF]"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-700">คลิกเพื่อเลือกไฟล์</p>
+                                            <p class="text-xs text-gray-400 font-medium" id="file-count-display">เลือกได้มากกว่า 1 ไฟล์ (PDF, รูปภาพ, ฯลฯ)</p>
+                                        </div>
+                                    </div>
+
+                                    <input type="file" name="attached_files" id="id_attached_files" class="hidden" multiple
+                                        onchange="updateFileList(this)">
+                                </label>
                             </div>
-                            {% endif %}
+
+                            <button
+                                class="btn btn-outline border-gray-200 bg-white hover:bg-red-50 hover:border-red-200 text-gray-400 hover:text-red-500 rounded-xl px-4 transition-all"
+                                type="button"
+                                title="ล้างไฟล์ที่เลือก"
+                                onclick="clearFiles()">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+
+                        <div id="file-list-preview" class="mt-3 space-y-2 hidden">
+                            </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit"
+                            class="btn bg-gradient-to-r from-[#5651FF] to-[#4743e6] hover:from-[#4743e6] hover:to-[#3d39d1] text-white border-none shadow-lg hover:shadow-xl transition-all duration-300 px-10 rounded-xl">
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            <span class="font-bold">โพสต์ประกาศ</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Announcements List -->
+            {% for announcement in announcements %}
+            <div
+                class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4 hover:shadow-lg hover:border-gray-200 transition-all duration-300">
+                <!-- Announcement Header -->
+                <div class="flex justify-between items-start p-6 pb-4">
+                    <div class="flex items-start gap-3 flex-1">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-bullhorn text-[#5651FF]"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h5 class="text-base font-bold text-gray-800">
+                                ประกาศโดย {{ announcement.author.get_full_name|default:announcement.author.email }}
+                            </h5>
+                            <small class="text-gray-400 text-xs flex items-center gap-1">
+                                <i class="far fa-clock"></i>
+                                {{ announcement.created_at|date:"d M Y, H:i" }}
+                            </small>
                         </div>
                     </div>
-                    
-                    <p class="card-text mt-2">{{ announcement.content|linebreaksbr }}</p>
-                    
-                    <div id="raw-content-{{ announcement.pk }}" class="d-none">{{ announcement.content }}</div>
-                    
-                    {% if announcement.files.all %}
-                        <hr><p class="mb-2"><strong>ไฟล์แนบ:</strong></p>
-                        <div class="list-group list-group-flush">
-                        {% for attachment in announcement.files.all %}
-                            <a href="{{ attachment.file.url }}" target="_blank" class="list-group-item list-group-item-action list-group-item-light py-2 px-3"><i class="fas fa-paperclip me-2"></i> {{ attachment }}</a>
-                        {% endfor %}
-                        </div>
 
-                        <div id="raw-files-list-{{ announcement.pk }}" class="d-none">
-                            {% for file_obj in announcement.files.all %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <span class="text-truncate" style="max-width: 250px;"><i class="fas fa-paperclip me-2"></i> {{ file_obj }}</span>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="delete_file_ids" value="{{ file_obj.id }}" id="del_gen_{{ file_obj.id }}">
-                                    <label class="form-check-label text-danger" for="del_gen_{{ file_obj.id }}">ลบ</label>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
+                    {% if announcement.author == request.user %}
+                    <div class="inline-block relative -mt-1.5"> 
+                        <details class="dropdown dropdown-end">
+                            <summary tabindex="0"
+                                class="list-none btn btn-ghost border-none w-8 h-8 min-h-0 p-0 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-0 active:scale-90 transition-all flex items-center justify-center cursor-pointer appearance-none">
+                                <i class="fas fa-ellipsis-v text-gray-400 text-sm"></i>
+                            </summary>
+                            
+                            <ul tabindex="0"
+                                class="dropdown-content menu p-1.5 shadow-[0_10px_40px_rgba(0,0,0,0.12)] bg-white rounded-[1.25rem] w-40 border border-gray-100 z-[60] -mt-10 mr-9 animate-in fade-in zoom-in duration-150 origin-top-right">
+                                
+                                <li class="mb-0.5">
+                                    <a class="hover:bg-blue-50 rounded-xl font-medium text-gray-700 py-2 px-3 flex items-center gap-3 text-sm"
+                                        onclick="event.preventDefault(); openEditModal({{ announcement.pk }}, '{% url 'teacher:announcement_edit' pk=announcement.pk %}'); this.closest('details').removeAttribute('open');">
+                                        <div class="w-7 h-7 rounded-lg bg-[#5651FF]/10 flex items-center justify-center">
+                                            <i class="fas fa-edit text-[#5651FF] text-xs"></i>
+                                        </div>
+                                        <span>แก้ไข</span>
+                                    </a>
+                                </li>
+
+                                <div class="divider my-0.5 opacity-40 px-2"></div>
+
+                                <li class="mt-0.5">
+                                    <a class="text-red-500 hover:bg-red-50 rounded-xl font-medium py-2 px-3 flex items-center gap-3 text-sm"
+                                        onclick="event.preventDefault(); openDeleteModal('{% url 'teacher:announcement_delete' pk=announcement.pk %}', '{{ announcement.content|truncatewords:10 }}'); this.closest('details').removeAttribute('open');">
+                                        <div class="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                        </div>
+                                        <span>ลบ</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </details>
+                    </div>
                     {% endif %}
                 </div>
+
+                <!-- Announcement Content -->
+                <div class="px-6 pb-6">
+                    <p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ announcement.content }}</p>
+
+                    <!-- Hidden Raw Content for Modal -->
+                    <div id="raw-content-{{ announcement.pk }}" class="hidden">{{ announcement.content }}</div>
+                </div>
+
+                <!-- Attached Files -->
+                {% if announcement.files.all %}
+                <div class="bg-gray-50 border-t border-gray-100 px-6 py-4">
+                    <p class="font-bold text-gray-700 mb-3 text-sm flex items-center gap-2">
+                        <i class="fas fa-paperclip text-gray-400"></i>
+                        ไฟล์แนบ:
+                    </p>
+                    <div class="flex flex-col gap-2">
+                        {% for attachment in announcement.files.all %}
+                        <a href="{{ attachment.file.url }}" target="_blank"
+                            class="flex items-center gap-3 p-3 bg-white hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-all duration-200 text-gray-700 group">
+                            <div
+                                class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+                                <i class="fas fa-file-alt text-blue-600 text-sm"></i>
+                            </div>
+                            <span class="text-sm font-medium flex-1 truncate">{{ attachment }}</span>
+                            <i
+                                class="fas fa-external-link-alt text-gray-400 text-xs group-hover:text-blue-500 transition-colors"></i>
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Raw Files List for Modal -->
+                    <div id="raw-files-list-{{ announcement.pk }}" class="hidden">
+                        {% for file_obj in announcement.files.all %}
+                        <div class="flex justify-between items-center p-2 border-b">
+                            <span class="truncate max-w-xs">
+                                <i class="fas fa-paperclip mr-2"></i> {{ file_obj }}
+                            </span>
+                            <div class="form-control">
+                                <label class="cursor-pointer label gap-2">
+                                    <input type="checkbox" name="delete_file_ids" value="{{ file_obj.id }}"
+                                        class="checkbox checkbox-error checkbox-sm">
+                                    <span class="label-text text-error font-medium">ลบ</span>
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% empty %}
-            <div class="alert alert-info text-center" role="alert">ยังไม่มีประกาศในห้องเรียนนี้</div>
+            <div class="bg-blue-50 border border-blue-100 text-blue-700 px-6 py-8 rounded-2xl text-center">
+                <i class="fas fa-info-circle text-3xl mb-2"></i>
+                <p class="font-medium">ยังไม่มีประกาศในห้องเรียนนี้</p>
+            </div>
             {% endfor %}
         </div>
 
-        <div class="tab-pane fade" id="assignments-tab-pane" role="tabpanel">
-            <div class="d-flex justify-content-between align-items-center mb-3"><h3 class="mb-0">รายการงานทั้งหมด</h3><a href="{% url 'teacher:create_assignment' room.id %}" class="btn btn-primary"><i class="fas fa-plus me-2"></i>สร้างงาน</a></div>
-            <div class="list-group">
-                {% for assignment in assignments %}<a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}" class="list-group-item list-group-item-action mb-2 shadow-sm"><div class="d-flex w-100 justify-content-between"><h5 class="mb-1"><i class="fas fa-clipboard-list text-info me-2"></i>{{ assignment.title }}</h5></div><p class="mb-1 text-muted">{% if assignment.due_date %}กำหนดส่ง: {{ assignment.due_date|date:"d F Y, H:i" }}{% else %}ไม่มีกำหนดส่ง{% endif %}</p></a>{% empty %}<div class="alert alert-info text-center" role="alert">ยังไม่มีงานที่ได้รับมอบหมาย</div>{% endfor %}
+        <!-- Assignments Tab -->
+        <div class="tab-content-pane" id="assignments-pane">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">รายการงานทั้งหมด</h3>
+                <a href="{% url 'teacher:create_assignment' room.id %}"
+                    class="btn border-none bg-[#5651FF] hover:bg-[#4843E6] h-12 px-6 rounded-xl text-white font-bold shadow-lg shadow-[#5651FF]/20 hover:shadow-xl active:scale-[0.97] transition-all duration-300 group flex items-center">
+                    
+                    <div class="flex items-center justify-center w-6 h-6 bg-white/20 rounded-lg mr-3 group-hover:rotate-90 transition-transform duration-300">
+                        <i class="fas fa-plus text-xs"></i>
+                    </div>
+                    
+                    <span class="tracking-wide text-sm">สร้างงานใหม่</span>
+                </a>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                {% for assignment in assignments %}
+                <a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}"
+                    class="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-lg hover:border-[#5651FF]/30 transition-all duration-300 group">
+                    <div class="flex justify-between items-start">
+                        <h5
+                            class="text-lg font-bold text-gray-800 group-hover:text-[#5651FF] transition-colors flex items-center">
+                            <i class="fas fa-clipboard-list text-[#5651FF] mr-3"></i>
+                            {{ assignment.title }}
+                        </h5>
+                    </div>
+                    <p class="text-gray-500 text-sm mt-2">
+                        {% if assignment.due_date %}
+                        <i class="far fa-clock mr-1"></i> กำหนดส่ง: {{ assignment.due_date|date:"d F Y, H:i" }}
+                        {% else %}
+                        <i class="fas fa-infinity mr-1"></i> ไม่มีกำหนดส่ง
+                        {% endif %}
+                    </p>
+                </a>
+                {% empty %}
+                <div class="bg-blue-50 border border-blue-100 text-blue-700 px-6 py-8 rounded-2xl text-center">
+                    <i class="fas fa-clipboard text-3xl mb-2"></i>
+                    <p class="font-medium">ยังไม่มีงานที่ได้รับมอบหมาย</p>
+                </div>
+                {% endfor %}
             </div>
         </div>
+
+        <!-- People Tab -->
+        <div class="tab-content-pane" id="people-pane">
+            <!-- Teachers Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                <h3 class="text-xl font-bold text-[#5651FF] border-b border-gray-100 pb-3 mb-4">
+                    <i class="fas fa-user-tie mr-2"></i> คณะอาจารย์
+                </h3>
+                <ul class="space-y-3">
+                    <li class="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+                        <div class="w-10 h-10 bg-[#5651FF] rounded-full flex items-center justify-center text-white">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <span class="font-medium text-gray-800">
+                            {{ room.owner.get_full_name|default:room.owner.email }}
+                            <span class="text-xs bg-[#5651FF] text-white px-2 py-1 rounded-full ml-2">เจ้าของห้อง</span>
+                        </span>
+                    </li>
+                    {% for teacher in room.teachers.all %}
+                    {% if teacher.user != room.owner %}
+                    <li class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                        <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <span class="font-medium text-gray-700">{{ teacher.user.get_full_name|default:teacher.user.email }}</span>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Students Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-xl font-bold text-[#5651FF] border-b border-gray-100 pb-3 mb-4">
+                    <i class="fas fa-user-graduate mr-2"></i> นักเรียน
+                </h3>
+                <ul class="space-y-2">
+                    {% for student in room.students.all %}
+                    <li class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                            <i class="fas fa-user-graduate text-sm"></i>
+                        </div>
+                        <span class="text-gray-700">{{ student.user.get_full_name|default:student.user.email }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="text-center py-8 text-gray-400">
+                        <i class="fas fa-user-slash text-3xl mb-2"></i>
+                        <p>ยังไม่มีนักเรียนในห้องนี้</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Announcement Modal -->
+<dialog id="globalEditAnnouncementModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white max-w-3xl p-0 overflow-hidden rounded-none shadow-2xl border border-gray-100">
         
-        <div class="tab-pane fade" id="people-tab-pane" role="tabpanel">
-            <h3 class="text-primary border-bottom pb-2 mb-3">คณะอาจารย์</h3>
-            <ul class="list-group list-group-flush mb-4">
-                <li class="list-group-item d-flex align-items-center"><i class="fas fa-user-tie fa-lg text-muted me-3"></i><span>{{ room.owner.get_full_name|default:room.owner.email }} (เจ้าของห้อง)</span></li>
-                {% for teacher in room.teachers.all %}{% if teacher.user != room.owner %}<li class="list-group-item d-flex align-items-center"><i class="fas fa-user-circle fa-lg text-muted me-3"></i><span>{{ teacher.user.get_full_name|default:teacher.user.email }}</span></li>{% endif %}{% endfor %}
-            </ul>
-            <h3 class="text-primary border-bottom pb-2 mb-3 mt-5">นักเรียน</h3>
-            <ul class="list-group list-group-flush">
-                {% for student in room.students.all %}<li class="list-group-item d-flex align-items-center"><i class="fas fa-user-graduate text-muted me-3"></i><span>{{ student.user.get_full_name|default:student.user.email }}</span></li>{% empty %}<li class="list-group-item">ยังไม่มีนักเรียนในห้องนี้</li>{% endfor %}
-            </ul>
+        <div class="bg-gray-50/50 px-10 py-8 border-b border-gray-100">
+            <h3 class="font-bold text-3xl text-gray-800 flex items-center gap-4">
+                <div class="w-12 h-12 bg-[#5651FF]/10 rounded-none flex items-center justify-center">
+                    <i class="fas fa-bullhorn text-[#5651FF] text-xl"></i>
+                </div>
+                แก้ไขประกาศ
+            </h3>
         </div>
-    </div>
-</div>
 
-<div class="modal fade" id="globalEditAnnouncementModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">แก้ไขประกาศ</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="POST" enctype="multipart/form-data" id="globalEditForm">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">เนื้อหาประกาศ</label>
-                        <textarea name="content" id="globalEditContent" class="form-control" rows="3"></textarea>
-                    </div>
-            
-                    <div class="mb-3 d-none" id="globalEditFilesContainer">
-                        <label class="form-label text-danger">ลบไฟล์เดิม:</label>
-                        <div class="list-group" id="globalEditFilesList">
+        <form method="POST" enctype="multipart/form-data" id="globalEditForm" class="p-10">
+            {% csrf_token %}
+            <div class="space-y-8">
+                
+                <div>
+                    <label class="block text-base font-bold text-gray-600 mb-3 ml-1">เนื้อหาประกาศ</label>
+                    <textarea name="content" id="globalEditContent"
+                        class="textarea textarea-bordered w-full min-h-[160px] bg-gray-50 rounded-none border-2 border-gray-200 focus:border-[#5651FF] focus:outline-none text-lg p-5 transition-all" 
+                        placeholder="พิมพ์ข้อความประกาศที่นี่..." rows="4"></textarea>
+                </div>
+
+                <div id="globalEditFilesContainer" class="hidden">
+                    <label class="block text-base font-bold text-red-500 mb-3 ml-1 flex items-center gap-2">
+                        <i class="fas fa-folder-minus"></i> ลบไฟล์เดิม:
+                    </label>
+                    <div class="bg-red-50/50 rounded-none p-4 border border-red-100" id="globalEditFilesList">
+                        </div>
+                </div>
+
+                <div>
+                    <label class="block text-base font-bold text-[#5651FF] mb-3 ml-1 flex items-center gap-2">
+                        <i class="fas fa-file-upload"></i> เพิ่มไฟล์ใหม่:
+                    </label>
+                    <div class="flex items-center justify-center w-full">
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-none cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all hover:border-[#5651FF]/50 group">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fas fa-cloud-upload-alt text-gray-400 text-2xl mb-2 group-hover:scale-110 transition-transform"></i>
+                                <p class="mb-1 text-sm text-gray-500 font-bold">คลิกเพื่อเลือกไฟล์แนบเพิ่มเติม</p>
+                                <p class="text-xs text-gray-400">สามารถเลือกได้หลายไฟล์พร้อมกัน</p>
                             </div>
-                    </div>
-            
-                    <div class="mb-3">
-                        <label class="form-label text-success">เพิ่มไฟล์ใหม่:</label>
-                        <input type="file" name="new_files" class="form-control" multiple>
+                            <input type="file" name="new_files" class="hidden" multiple>
+                        </label>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary">บันทึก</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="globalDeleteAnnouncementModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">ยืนยันการลบประกาศ</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-            <div class="modal-body">
-                <p>คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้?</p>
-                <p class="text-muted border-start border-3 ps-2 fst-italic" id="globalDeletePreview">...</p>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                <form id="globalDeleteForm" method="post">
+
+            <div class="flex items-center justify-end gap-4 mt-12">
+                <button type="button" 
+                    class="btn btn-ghost px-8 h-14 rounded-none font-bold text-gray-500 hover:bg-gray-100 text-base transition-all" 
+                    onclick="globalEditAnnouncementModal.close()">
+                    ยกเลิก
+                </button>
+                <button type="submit" 
+                    class="btn bg-[#5651FF] hover:bg-[#4843E6] text-white border-none px-12 h-14 rounded-none font-bold shadow-lg shadow-[#5651FF]/20 active:scale-95 transition-all text-base">
+                    บันทึกการเปลี่ยนแปลง
+                </button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<!-- Delete Announcement Modal -->
+<dialog id="globalDeleteAnnouncementModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white max-w-3xl p-0 overflow-hidden rounded-none shadow-2xl border border-gray-100">
+        
+        <div class="bg-red-50/50 px-10 py-8 border-b border-gray-100">
+            <h3 class="font-bold text-3xl text-gray-800 flex items-center gap-4">
+                <div class="w-12 h-12 bg-red-600 rounded-none flex items-center justify-center shadow-lg shadow-red-200">
+                    <i class="fas fa-exclamation-triangle text-white text-xl"></i>
+                </div>
+                ยืนยันการลบประกาศ
+            </h3>
+        </div>
+
+        <div class="p-10">
+            <div class="mb-8">
+                <p class="text-xl text-gray-700 font-medium mb-2">คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้?</p>
+                <p class="text-base text-gray-500">ข้อมูลที่ถูกลบไปแล้วจะไม่สามารถกู้คืนกลับมาได้อีก โปรดตรวจสอบความถูกต้อง</p>
+            </div>
+            
+            <div class="bg-gray-50 p-6 rounded-none border-l-8 border-red-600 mb-10">
+                <p class="text-xs font-black text-red-500 uppercase tracking-[0.2em] mb-3">เนื้อหาที่กำลังจะลบ:</p>
+                <div class="text-gray-700 italic text-lg leading-relaxed" id="globalDeletePreview">
+                    ...
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-4 mt-6">
+                <button type="button" 
+                    class="btn btn-ghost px-8 h-14 rounded-none font-bold text-gray-500 hover:bg-gray-100 text-base transition-all" 
+                    onclick="globalDeleteAnnouncementModal.close()">
+                    ยกเลิก
+                </button>
+                
+                <form id="globalDeleteForm" method="post" class="inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">ยืนยันการลบ</button>
+                    <button type="submit" 
+                        class="btn bg-red-600 hover:bg-red-700 text-white border-none px-12 h-14 rounded-none font-bold shadow-xl shadow-red-100 active:scale-95 transition-all text-base">
+                        ยืนยันการลบประกาศ
+                    </button>
                 </form>
             </div>
         </div>
     </div>
-</div>
+</dialog>
 
-<div class="modal fade" id="editRoomModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">แก้ไขข้อมูลห้องเรียน</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="post" action="{% url 'room:teacher_detail' pk=room.pk %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="edit_room">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="{{ edit_form.name.id_for_label }}" class="form-label">{{ edit_form.name.label }}</label>
+<!-- Edit Room Modal -->
+<dialog id="editRoomModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white max-w-3xl p-0 overflow-hidden rounded-none shadow-2xl border border-gray-100">
+        
+        <div class="bg-gray-50/50 px-10 py-8 border-b border-gray-100">
+            <h3 class="font-bold text-3xl text-gray-800 flex items-center gap-4">
+                <div class="w-12 h-12 bg-[#5651FF]/10 rounded-none flex items-center justify-center">
+                    <i class="fas fa-edit text-[#5651FF] text-xl"></i>
+                </div>
+                แก้ไขข้อมูลห้องเรียน
+            </h3>
+        </div>
+
+        <form method="post" action="{% url 'room:teacher_detail' pk=room.pk %}" enctype="multipart/form-data" class="p-10">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_room">
+
+            <div class="space-y-8">
+                <div>
+                    <label for="{{ edit_form.name.id_for_label }}" class="block text-base font-bold text-gray-600 mb-3 ml-1">
+                        {{ edit_form.name.label }}
+                    </label>
+                    <div class="relative group">
                         {{ edit_form.name }}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">{{ edit_form.cover_image.label }}</label>
+                </div>
+
+                <div>
+                    <label class="block text-base font-bold text-gray-600 mb-4 ml-1">
+                        {{ edit_form.cover_image.label }}
+                    </label>
+                    
+                    <div class="relative group">
                         {% if room.cover_image %}
-                            <img src="{{ room.cover_image.url }}" class="img-fluid rounded mb-2" alt="Cover" style="max-height: 200px;">
-                        {% endif %}
-                        <input type="file" name="{{ edit_form.cover_image.html_name }}" class="form-control mt-2">
-                        {% if room.cover_image %}
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" name="cover_image-clear" id="cover_image-clear_id">
-                            <label class="form-check-label" for="cover_image-clear_id">ลบรูปภาพปัจจุบัน</label>
+                        <div class="relative overflow-hidden rounded-none mb-6 shadow-sm border border-gray-200">
+                            <img src="{{ room.cover_image.url }}" class="w-full max-h-64 object-cover" alt="Current Cover">
+                            <div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <p class="text-white text-base font-medium">รูปหน้าปกปัจจุบัน</p>
+                            </div>
                         </div>
                         {% endif %}
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary">บันทึก</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
-<div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">ยืนยันการลบ</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <div class="flex items-center justify-center w-full">
+                            <label class="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-none cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all hover:border-[#5651FF]/50 group/upload">
+                                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <i class="fas fa-cloud-upload-alt text-gray-400 text-3xl mb-3 group-hover/upload:scale-110 group-hover/upload:text-[#5651FF] transition-all"></i>
+                                    <p class="mb-1 text-base text-gray-500 font-bold">คลิกเพื่ออัปโหลดรูปภาพใหม่</p>
+                                    <p class="text-sm text-gray-400 px-4 text-center">แนะนำขนาด 1200 x 400 พิกเซล หรือสัดส่วน 3:1 (JPG, PNG)</p>
+                                </div>
+                                <input type="file" name="{{ edit_form.cover_image.html_name }}" class="hidden" />
+                            </label>
+                        </div>
+                    </div>
+
+                    {% if room.cover_image %}
+                    <div class="flex justify-end mt-4">
+                        <label class="inline-flex items-center cursor-pointer group/delete bg-red-50 px-4 py-2 rounded-none hover:bg-red-100 transition-colors">
+                            <input type="checkbox" name="cover_image-clear" id="cover_image-clear_id" class="checkbox checkbox-error checkbox-md rounded-none">
+                            <span class="label-text text-red-500 font-bold text-sm ml-3">ลบรูปภาพปัจจุบัน</span>
+                        </label>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="modal-body">
-                <p>คุณแน่ใจหรือไม่ว่าต้องการลบห้องเรียน <span class="fw-bold">"{{ room.name }}"</span>?</p>
-                <p class="text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+
+            <div class="flex items-center justify-end gap-4 mt-12">
+                <button type="button" class="btn btn-ghost px-8 h-12 rounded-none font-bold text-gray-500 hover:bg-gray-100 text-base" 
+                    onclick="editRoomModal.close()">
+                    ยกเลิก
+                </button>
+                <button type="submit" class="btn bg-[#5651FF] hover:bg-[#4843E6] text-white border-none px-12 h-12 rounded-none font-bold shadow-xl shadow-[#5651FF]/20 active:scale-95 transition-all text-base">
+                    บันทึกการเปลี่ยนแปลง
+                </button>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                <form action="{% url 'teacher:room_delete' pk=room.pk %}" method="post">
+        </form>
+    </div>
+</dialog>
+
+<!-- Delete Room Modal -->
+<dialog id="deleteRoomModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white max-w-3xl p-0 overflow-hidden rounded-none shadow-2xl border border-gray-100">
+        
+        <div class="bg-red-50/50 px-10 py-8 border-b border-gray-100">
+            <h3 class="font-bold text-3xl text-gray-800 flex items-center gap-4">
+                <div class="w-12 h-12 bg-red-600 rounded-none flex items-center justify-center shadow-lg shadow-red-200">
+                    <i class="fas fa-exclamation-triangle text-white text-xl"></i>
+                </div>
+                ยืนยันการลบห้องเรียน
+            </h3>
+        </div>
+
+        <div class="p-10">
+            <div class="mb-8">
+                <p class="text-xl text-gray-700 font-medium mb-4">
+                    คุณแน่ใจหรือไม่ว่าต้องการลบห้องเรียน 
+                    <span class="text-red-600 font-bold">"{{ room.name }}"</span>?
+                </p>
+                
+                <div class="bg-red-50 p-6 border-l-8 border-red-600 rounded-none">
+                    <p class="text-red-700 font-bold flex items-center gap-2 mb-2">
+                        <i class="fas fa-exclamation-circle"></i>
+                        คำเตือนสำคัญ:
+                    </p>
+                    <p class="text-red-600 text-base leading-relaxed">
+                        การดำเนินการนี้จะลบข้อมูลทั้งหมดในห้องเรียน รวมถึงประกาศ ไฟล์แนบ และข้อมูลนักเรียน 
+                        <span class="font-black uppercase decoration-2 underline">ไม่สามารถกู้คืนข้อมูลได้ในภายหลัง</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-4 mt-10">
+                <button type="button" 
+                    class="btn btn-ghost px-8 h-14 rounded-none font-bold text-gray-500 hover:bg-gray-100 text-base transition-all" 
+                    onclick="deleteRoomModal.close()">
+                    ยกเลิก
+                </button>
+                
+                <form action="{% url 'teacher:room_delete' pk=room.pk %}" method="post" class="inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">ยืนยันการลบ</button>
+                    <button type="submit" 
+                        class="btn bg-red-600 hover:bg-red-700 text-white border-none px-12 h-14 rounded-none font-bold shadow-xl shadow-red-100 active:scale-95 transition-all text-base">
+                        ยืนยันการลบห้องเรียน
+                    </button>
                 </form>
             </div>
         </div>
     </div>
-</div>
+</dialog>
 
 <script>
+    // Tab Navigation System
     document.addEventListener('DOMContentLoaded', function () {
-        
-        // 1. จัดการ Modal แก้ไข (Edit)
-        var editModal = document.getElementById('globalEditAnnouncementModal');
-        editModal.addEventListener('show.bs.modal', function (event) {
-            // ปุ่มที่กด
-            var button = event.relatedTarget;
-            // ดึงข้อมูลจาก Data Attributes
-            var id = button.getAttribute('data-id');
-            var actionUrl = button.getAttribute('data-action-url');
-            
-            // ดึง Content จาก div ที่ซ่อนอยู่ (ป้องกันปัญหา Line break ใน data attr)
-            var rawContent = document.getElementById('raw-content-' + id).innerText;
-            
-            // อัปเดต Form Action
-            var form = editModal.querySelector('#globalEditForm');
-            form.action = actionUrl;
-            
-            // อัปเดต Textarea
-            editModal.querySelector('#globalEditContent').value = rawContent;
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabPanes = document.querySelectorAll('.tab-content-pane');
 
-            // จัดการ List ไฟล์ (Copy HTML จาก Hidden div มาใส่ Modal)
-            var filesContainer = editModal.querySelector('#globalEditFilesContainer');
-            var filesListTarget = editModal.querySelector('#globalEditFilesList');
-            var sourceFilesDiv = document.getElementById('raw-files-list-' + id);
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                // Remove active from all buttons and panes
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanes.forEach(pane => pane.classList.remove('active'));
 
-            if (sourceFilesDiv) {
-                // มีไฟล์เดิม -> เอา HTML มาใส่
-                filesListTarget.innerHTML = sourceFilesDiv.innerHTML;
-                filesContainer.classList.remove('d-none');
-            } else {
-                // ไม่มีไฟล์เดิม -> ซ่อนส่วนลบไฟล์
-                filesListTarget.innerHTML = '';
-                filesContainer.classList.add('d-none');
-            }
-        });
+                // Add active to clicked button
+                this.classList.add('active');
 
-        // 2. จัดการ Modal ลบ (Delete)
-        var deleteModal = document.getElementById('globalDeleteAnnouncementModal');
-        deleteModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var actionUrl = button.getAttribute('data-action-url');
-            var previewText = button.getAttribute('data-preview-text');
-
-            // อัปเดต Form Action
-            var form = deleteModal.querySelector('#globalDeleteForm');
-            form.action = actionUrl;
-
-            // อัปเดตข้อความตัวอย่าง
-            deleteModal.querySelector('#globalDeletePreview').textContent = '"' + previewText + '..."';
+                // Show corresponding pane
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(tabId + '-pane').classList.add('active');
+            });
         });
     });
+    function updateFileList(input) {
+    const previewContainer = document.getElementById('file-list-preview');
+    const countDisplay = document.getElementById('file-count-display');
+    
+    previewContainer.innerHTML = ''; // ล้างรายการเดิม
+    
+    if (input.files && input.files.length > 0) {
+        previewContainer.classList.remove('hidden');
+        countDisplay.innerText = 'เลือกแล้ว ' + input.files.length + ' ไฟล์';
+        countDisplay.classList.add('text-[#5651FF]');
+        
+        // วนลูปสร้างรายการชื่อไฟล์
+        Array.from(input.files).forEach(file => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'flex items-center gap-2 text-sm text-gray-600 bg-gray-100/50 px-3 py-2 rounded-lg border border-gray-200';
+            fileItem.innerHTML = `
+                <i class="far fa-file-alt text-gray-400"></i>
+                <span class="flex-1 truncate">${file.name}</span>
+                <span class="text-[10px] text-gray-400 uppercase">${(file.size / 1024).toFixed(1)} KB</span>
+            `;
+            previewContainer.appendChild(fileItem);
+        });
+    } else {
+        previewContainer.classList.add('hidden');
+        countDisplay.innerText = 'เลือกได้มากกว่า 1 ไฟล์ (PDF, รูปภาพ, ฯลฯ)';
+        countDisplay.classList.remove('text-[#5651FF]');
+    }
+}
+
+function clearFiles() {
+    const input = document.getElementById('id_attached_files');
+    input.value = '';
+    updateFileList(input); // อัปเดต UI
+}
+    // Edit Announcement Modal Handler
+    function openEditModal(announcementId, actionUrl) {
+        const modal = document.getElementById('globalEditAnnouncementModal');
+        const form = document.getElementById('globalEditForm');
+        const contentTextarea = document.getElementById('globalEditContent');
+
+        // Set form action
+        form.action = actionUrl;
+
+        // Load content from hidden div
+        const rawContent = document.getElementById('raw-content-' + announcementId);
+        if (rawContent) {
+            contentTextarea.value = rawContent.innerText;
+        }
+
+        // Load files list
+        const filesContainer = document.getElementById('globalEditFilesContainer');
+        const filesList = document.getElementById('globalEditFilesList');
+        const rawFilesList = document.getElementById('raw-files-list-' + announcementId);
+
+        if (rawFilesList && rawFilesList.innerHTML.trim() !== '') {
+            filesList.innerHTML = rawFilesList.innerHTML;
+            filesContainer.classList.remove('hidden');
+        } else {
+            filesList.innerHTML = '';
+            filesContainer.classList.add('hidden');
+        }
+
+        modal.showModal();
+    }
+
+    // Delete Announcement Modal Handler
+    function openDeleteModal(actionUrl, previewText) {
+        const modal = document.getElementById('globalDeleteAnnouncementModal');
+        const form = document.getElementById('globalDeleteForm');
+        const preview = document.getElementById('globalDeletePreview');
+
+        form.action = actionUrl;
+        preview.textContent = '"' + previewText + '..."';
+
+        modal.showModal();
+    }
 </script>
 
 {% endblock %}

@@ -5,76 +5,103 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container mx-auto px-4 py-8 max-w-6xl">
 
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div
+        class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-6 border-b border-gray-200">
         <div>
-            <h2 class="mb-0 text-danger"><i class="fas fa-exclamation-circle me-2"></i>รายการแจ้งปัญหา</h2>
-            <p class="text-muted mb-0">
-                งาน: {{ assignment.title }}
+            <h2 class="text-3xl font-black text-red-600 flex items-center gap-3">
+                <i class="fas fa-exclamation-circle"></i>
+                รายการแจ้งปัญหา
+            </h2>
+            <p class="text-gray-500 mt-1">
+                <span class="font-bold">งาน:</span> {{ assignment.title }}
             </p>
         </div>
 
-        <a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>กลับหน้ารวม
+        <a href="{% url 'teacher:assignment_detail' pk=assignment.pk %}"
+            class="mt-4 md:mt-0 btn btn-outline btn-sm sm:btn-md gap-2 rounded-xl hover:bg-gray-100 border-gray-300 text-gray-600">
+            <i class="fas fa-arrow-left"></i>
+            กลับหน้ารวม
         </a>
     </div>
 
-    <div class="card shadow-sm border-danger">
-        <div class="card-header bg-danger text-white">
-            <h5 class="mb-0">นักเรียนที่แจ้งปัญหา ({{ reported_submissions|length }})</h5>
+    <div class="card bg-white shadow-xl border border-red-100 rounded-2xl overflow-hidden">
+        <div class="bg-red-600 px-6 py-4">
+            <h3 class="text-white font-bold text-lg flex items-center gap-2">
+                <i class="fas fa-users"></i>
+                นักเรียนที่แจ้งปัญหา ({{ reported_submissions|length }})
+            </h3>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+
+        <div class="overflow-x-auto">
+            <table class="table w-full">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
                     <tr>
-                        <th>นักเรียน</th>
-                        <th>ปัญหาที่แจ้ง</th>
-                        <th>ส่งเมื่อ</th>
-                        <th class="text-end">จัดการ</th>
+                        <th class="py-4 px-6">นักเรียน</th>
+                        <th class="py-4 px-6 text-center">ปัญหาที่แจ้ง</th>
+                        <th class="py-4 px-6 text-center">ส่งเมื่อ</th>
+                        <th class="py-4 px-6 text-end">จัดการ</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="divide-y divide-gray-100">
                     {% for submission in reported_submissions %}
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                {% if submission.student.profile_image %}
-                                <img src="{{ submission.student.profile_image.url }}" class="rounded-circle me-2"
-                                    width="40" height="40" style="object-fit: cover;">
-                                {% else %}
-                                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2"
-                                    style="width: 40px; height: 40px;">
-                                    {{ submission.student.name|slice:":1" }}
+                    <tr class="hover:bg-red-50/30 transition-colors">
+                        <td class="py-4 px-6">
+                            <div class="flex items-center gap-3">
+                                <div class="avatar">
+                                    <div class="w-10 h-10 rounded-full ring ring-red-100 ring-offset-2 overflow-hidden">
+                                        {% if submission.student.student_profile.profile_image %}
+                                        <img src="{{ submission.student.student_profile.profile_image.url }}"
+                                            alt="profile" class="w-full h-full object-cover">
+                                        {% else %}
+                                        <div
+                                            class="bg-red-100 text-red-600 w-full h-full flex items-center justify-center font-black">
+                                            {{ submission.student.student_profile.name|slice:":1"|default:submission.student.email|slice:":1"|upper }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                {% endif %}
                                 <div>
-                                    <div class="fw-bold">{{ submission.student.name }}</div>
-                                    <small class="text-muted">{{ submission.student.user.email }}</small>
+                                    <div class="font-black text-slate-800">{{ submission.student.student_profile.name|default:"- ไม่ระบุชื่อ -" }}</div>
+                                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{{ submission.student.email }}</div>
                                 </div>
                             </div>
                         </td>
 
-                        <td>
-                            <span class="text-danger">{{ submission.report_reason|default:"- ไม่ระบุ -" }}</span>
+                        <td class="py-4 px-6 text-center">
+                            <span
+                                class="inline-flex items-center px-4 py-1.5 bg-red-50 text-red-600 rounded-xl font-bold text-sm border border-red-100">
+                                {{ submission.report_reason|default:"- ไม่ระบุ -" }}
+                            </span>
                         </td>
 
-                        <td>
-                            {{ submission.submitted_at|date:"d M H:i" }}
+                        <td class="py-4 px-6 text-center text-slate-500 text-sm">
+                            <div class="flex flex-col items-center">
+                                <span class="font-black text-slate-700">{{ submission.submitted_at|date:"d M Y" }}</span>
+                                <span class="text-[10px] uppercase font-bold text-slate-400">{{ submission.submitted_at|date:"H:i" }} น.</span>
+                            </div>
                         </td>
 
-                        <td class="text-end">
+                        <td class="py-4 px-6 text-end">
                             <a href="{% url 'teacher:review_submission' submission.pk %}"
-                                class="btn btn-danger btn-sm shadow-sm">
-                                <i class="fas fa-search-plus me-1"></i> ตรวจสอบ
+                                class="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-red-700 hover:-translate-y-0.5 transition-all transform active:scale-95">
+                                <i class="fas fa-search-plus"></i>
+                                ตรวจสอบ
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-5 text-muted">
-                            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i><br>
-                            ไม่พบรายการแจ้งปัญหา
+                        <td colspan="4" class="py-20 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div
+                                    class="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-check-circle fa-3x"></i>
+                                </div>
+                                <h4 class="text-xl font-bold text-gray-800">ยอดเยี่ยม! ไม่พบรายการแจ้งปัญหา</h4>
+                                <p class="text-gray-400 mt-1">นักเรียนทุกคนส่งงานได้ตามปกติในขณะนี้</p>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -83,4 +110,19 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* ปรับแต่ง Table ให้ดูทันสมัยขึ้น */
+    .table :where(thead, tfoot) :where(th, td) {
+        background-color: transparent;
+        color: #6b7280;
+        font-weight: 700;
+    }
+
+    .table tr.hover:hover th,
+    .table tr.hover:hover td {
+        background-color: rgba(254, 242, 242, 0.5);
+        /* สีแดงอ่อนๆ เวลา hover */
+    }
+</style>
 {% endblock %}
