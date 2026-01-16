@@ -2,11 +2,14 @@
 
 {% block submit_buttons_bottom %}
     {{ block.super }}
+    
     <div class="submit-row" style="margin-top: 10px;">
+        
         <input type="submit" 
-               value="⚡ บันทึกและทดสอบการเชื่อมต่อ (Save & Test Connection)" 
+               value="⚡ บันทึกและทดสอบการเชื่อมต่อ" 
                name="_test_connection" 
-               class="btn btn-info form-control" 
-               style="width: 100%; font-weight: bold;">
+               
+               class="btn-test-connection"
+               style="width: 100% !important;">
     </div>
 {% endblock %}

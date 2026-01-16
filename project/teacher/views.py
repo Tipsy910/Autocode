@@ -607,6 +607,9 @@ def review_submission_view(request, pk):
                 # UPDATE: ใช้ APPROVED ตาม model ใหม่ (เพื่อให้ปุ่มทำ Quiz ขึ้นฝั่งนักเรียน)
                 submission.status = 'APPROVED' 
                 
+                submission.is_reported = False       # ปิดสถานะการแจ้งปัญหา (กล่องแดงจะหายไป)
+                submission.report_reason = None      # ล้างข้อความ "ทดสอบ" ออกจาก Database
+
                 # --- ลบ Quiz เก่าทิ้งเพื่อให้สร้างใหม่ (Safe Delete) ---
                 # เพราะถ้านักเรียนเคยทำแล้วแต่ครูให้ผ่านใหม่ นักเรียนควรได้ทำ Quiz ใหม่หรือใช้ตัวเดิม
                 if quiz_instance:
@@ -631,6 +634,8 @@ def review_submission_view(request, pk):
                 submission.status = 'REJECTED'
                 submission.is_graded = False 
                 
+                submission.is_reported = False       # ปิดสถานะการแจ้งปัญหา (กล่องแดงจะหายไป)
+                submission.report_reason = None      # ล้างข้อความ "ทดสอบ" ออกจาก Database
                 # --- ลบ Quiz ทิ้ง (ถ้ามี) เพราะงานไม่ผ่าน ---
                 submission.quiz_generated = False
                 if quiz_instance:

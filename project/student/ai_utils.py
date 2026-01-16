@@ -9,7 +9,7 @@ from google.api_core import retry
 from .ai_schemas import AiMultiFeedback, QuizSchema
 import ast
 from room.utils import get_active_model
-
+from urllib.parse import urlparse
 
 try:
     from markdown import markdown as md_to_html
@@ -31,25 +31,6 @@ def check_colab_link_accessibility(url):
             return False, "ลิงก์ต้องขึ้นต้นด้วย https://colab.research.google.com/ เท่านั้น"
     except Exception:
         return False, "รูปแบบ URL ไม่ถูกต้อง"
-
-    # 2. ยิง Request ไปเช็คว่าลิงก์เปิดได้ไหม (Ping)
-    try:
-        # ใส่ User-Agent เพื่อไม่ให้ Google บล็อกว่าเราเป็นบอท
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        
-        # timeout=5 คือถ้าเกิน 5 วิให้ตัดจบ (กันเว็บค้าง)
-        response = requests.get(url, headers=headers, timeout=5)
-
-        # ถ้า Google Redirect ไปหน้า Login (accounts.google.com) แสดงว่าไม่ได้เปิดแชร์
-        if "accounts.google.com" in response.url or "signin" in response.url:
-            return False, "ลิงก์นี้เป็นส่วนตัว (Private) กรุณาเปิดแชร์เป็น 'Anyone with the link' (ทุกคนที่มีลิงก์)"
-        
-        # ถ้า Response ไม่ใช่ 200 OK
-        if response.status_code != 200:
-            return False, f"ไม่สามารถเข้าถึงลิงก์ได้ (Status: {response.status_code})"
-            
-    except requests.exceptions.RequestException:
-        return False, "ไม่สามารถเชื่อมต่อกับลิงก์ได้ (ลิงก์อาจเสียหรือหมดอายุ)"
 
     return True, ""
 
@@ -295,7 +276,7 @@ def evaluate_submission_with_ai(submission):
     # =========================================================
     print("--- ⏳ Sending to Gemini... ---")
     raw_response = call_gemini_structured(prompt_parts, AiMultiFeedback)
-    
+
     if not raw_response:
         return 0, "เกิดข้อผิดพลาด: AI ไม่ตอบสนอง"
 
@@ -306,34 +287,41 @@ def evaluate_submission_with_ai(submission):
         summary = data.get('overall_summary', '')
         feedbacks = data.get('feedbacks', [])
 
-        # สร้าง Report
+        # สร้าง Report (ใช้โครงสร้างเดิมของคุณเป๊ะๆ)
         report_lines = []
         if summary:
-            report_lines.append(f"📝 **สรุปภาพรวม:** {summary}")
-            report_lines.append("=" * 40 + "\n")
+            # แต่งแค่ตรงหัวข้อสรุปให้ดูสะอาดตาขึ้น
+            report_lines.append(f'<div class="mb-6 pb-6 border-b border-slate-100">')
+            report_lines.append(f'<div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Overall Summary</div>')
+            report_lines.append(f'<p class="text-lg text-slate-700 font-medium leading-relaxed">{summary}</p>')
+            report_lines.append(f'</div>')
 
         if not feedbacks:
-            report_lines.append("⚠️ AI ไม่ได้แยกรายละเอียดรายข้อมาให้")
+            report_lines.append('<p class="text-slate-400 italic">⚠️ AI ไม่ได้แยกรายละเอียดรายข้อมาให้</p>')
         else:
+            # ใช้การวนลูปเดิม แต่แต่ง HTML ข้างใน f-string
             for fb in feedbacks:
                 fname = fb.get('file_name', 'Unknown')
                 fscore = fb.get('partial_score', 0)
-                ftext = fb.get('feedback_text', '-').replace('\n', '\n  ')
+                ftext = fb.get('feedback_text', '-').replace('\n', '<br/>')
                 
+                # แต่งส่วนรายละเอียดแต่ละข้อ
                 report_lines.append(
-                    f"📌 **{fname}** (คะแนน: {fscore}/10)\n"
-                    f"  {ftext}\n"
-                    f"{'-' * 40}"
+                    f'<div class="mb-8">'
+                    f'  <div class="flex justify-between items-center mb-2">'
+                    f'    <span class="font-bold text-slate-900">📌 {fname}</span>'
+                    f'    <span class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">SCORE: {fscore}/10</span>'
+                    f'  </div>'
+                    f'  <div class="text-slate-500 pl-4 border-l-2 border-slate-100 leading-relaxed">'
+                    f'    {ftext}'
+                    f'  </div>'
+                    f'</div>'
                 )
         
-        final_feedback_text = "\n".join(report_lines)
+        # รวมทุกบรรทัดเข้าด้วยกัน
+        final_feedback_html = "".join(report_lines)
 
-        # แปลง Markdown -> HTML (ถ้ามีไลบรารี markdown) หากไม่มีก็แปลงเป็น <br/> เป็น fallback
-        if md_to_html:
-            final_feedback_html = md_to_html(final_feedback_text)
-        else:
-            final_feedback_html = final_feedback_text.replace('\n', '<br/>')
-
+        # ส่งค่ากลับ 2 ค่าตามโครงสร้างเดิมของคุณ
         return total_score, final_feedback_html
 
     except Exception as e:

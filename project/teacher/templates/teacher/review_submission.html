@@ -18,21 +18,25 @@
             <div class="card bg-white border border-gray-100 shadow-xl rounded-2xl overflow-hidden">
                 <div class="card-body p-6 sm:p-10">
                     <div class="flex items-center justify-between mb-8">
-                        <h2 class="text-3xl font-black text-gray-800">งานของ: <span style="color: #5651FF;">{{ submission.student.name }}</span></h2>
+                        <h2 class="text-3xl font-black text-gray-800">งานของ: <span style="color: #5651FF;">{{ submission.student.email }}</span></h2>
                         {% if submission.is_reported %}
-                        <div class="badge border-none gap-2 p-5 animate-pulse text-white font-bold" style="background-color: #D3302F;">
+                        <div class="badge border-none gap-2 p-5 animate-pulse text-white font-bold rounded-2xl" style="background-color: #D3302F;">
                             <i class="fas fa-exclamation-triangle"></i> แจ้งปัญหา
                         </div>
                         {% endif %}
                     </div>
 
                     {% if submission.is_reported %}
-                    <div class="alert shadow-sm mb-8 rounded-xl border-none" style="background-color: rgba(211, 48, 47, 0.1); color: #D3302F;">
-                        <div class="flex flex-col items-start">
-                            <span class="font-bold flex items-center gap-2 text-lg">
-                                <i class="fas fa-flag"></i> นักเรียนแจ้งปัญหา:
+                    <div class="alert shadow-sm mb-8 rounded-2xl border-none p-6" 
+                        style="background-color: rgba(211, 48, 47, 0.06); color: #D3302F; border: 1px solid rgba(211, 48, 47, 0.1);">
+                        <div class="flex flex-col items-start w-full">
+                            <span class="font-black flex items-center gap-2 text-lg mb-2">
+                                <i class="fas fa-flag animate-bounce"></i> 
+                                นักเรียนแจ้งปัญหาพบข้อผิดพลาด:
                             </span>
-                            <p class="mt-1 text-gray-700 text-lg">{{ submission.report_reason }}</p>
+                            <div class="bg-white/60 w-full p-4 rounded-xl border border-red-100/50">
+                                <p class="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap">{{ submission.report_reason }}</p>
+                            </div>
                         </div>
                     </div>
                     {% endif %}

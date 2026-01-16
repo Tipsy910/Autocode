@@ -1,51 +1,182 @@
 {% extends "admin/change_list.html" %}
 {% load i18n admin_urls %}
 
-{# แทรกเนื้อหาเหนือตารางรายการ (Result List) #}
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* 1. การ์ดหลัก */
+    .ai-status-card {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        padding: 25px;
+        margin-bottom: 30px;
+        border-left: 6px solid #ccc; /* Default border */
+        position: relative;
+        transition: all 0.3s ease;
+    }
+
+    /* 2. สถานะ Active (สีเขียว) */
+    .ai-status-card.active {
+        border-left-color: #10b981; /* เขียวมรกต */
+    }
+    
+    /* 3. สถานะ Inactive (สีแดง) */
+    .ai-status-card.inactive {
+        border-left-color: #ef4444; /* แดง */
+    }
+
+    /* 4. Layout การจัดวาง */
+    .card-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    .info-section {
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    /* 5. ไอคอน AI ใหญ่ๆ */
+    .ai-icon-box {
+        width: 60px;
+        height: 60px;
+        background: #f3f4f6;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+    }
+    .active .ai-icon-box { background: #d1fae5; color: #047857; }
+    .inactive .ai-icon-box { background: #fee2e2; color: #b91c1c; }
+
+    /* 6. Typography */
+    .model-name {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 0;
+    }
+    .status-text {
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* 7. ป้าย Badge สถานะ API */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .badge-success { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-error { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* 8. ปุ่ม Action */
+    .btn-config {
+        background-color: #10b981;
+        color: white !important;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+    }
+    .btn-config:hover {
+        background-color: #059669;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    /* 9. Animation ไฟกะพริบ (Pulsing Dot) */
+    .pulsing-dot {
+        width: 10px;
+        height: 10px;
+        background-color: #10b981;
+        border-radius: 50%;
+        display: inline-block;
+        position: relative;
+    }
+    .pulsing-dot::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        border-radius: 50%;
+        background-color: #10b981;
+        animation: pulse-ring 1.5s infinite;
+        z-index: -1;
+    }
+    @keyframes pulse-ring {
+        0% { transform: scale(1); opacity: 0.8; }
+        100% { transform: scale(3); opacity: 0; }
+    }
+
+</style>
+{% endblock %}
+
 {% block result_list %}
 
-    <div style="margin-bottom: 20px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
-        {% if active_config %}
-            background: linear-gradient(to right, #e8f5e9, #c8e6c9); border-left: 5px solid #28a745;
-        {% else %}
-            background: linear-gradient(to right, #ffebee, #ffcdd2); border-left: 5px solid #dc3545;
-        {% endif %}">
-
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <h3 style="margin: 0; color: #333; font-weight: bold;">
-                    🤖 AI Model ที่ใช้งานอยู่ปัจจุบัน (Active Model)
-                </h3>
+    <div class="ai-status-card {% if active_config %}active{% else %}inactive{% endif %}">
+        <div class="card-content">
+            
+            <div class="info-section">
+                <div class="ai-icon-box">
+                    {% if active_config %}🤖{% else %}⚠️{% endif %}
+                </div>
                 
-                {% if active_config %}
-                    <p style="margin: 5px 0 0 0; font-size: 16px; color: #2e7d32;">
-                        ขณะนี้ระบบกำลังใช้: <strong>{{ active_config.current_model.name }}</strong>
-                    </p>
-                    <div style="margin-top: 5px; font-size: 13px; color: #555;">
-                        API Key Status: 
-                        {% if active_config.last_status_ok %}
-                            <span style="color: green;">✅ เชื่อมต่อปกติ</span>
-                        {% else %}
-                            <span style="color: red;">❌ มีปัญหาการเชื่อมต่อ</span>
-                        {% endif %}
-                    </div>
-                {% else %}
-                    <p style="margin: 5px 0 0 0; font-size: 16px; color: #c62828;">
-                        ⚠️ ยังไม่มีโมเดลที่เปิดใช้งาน (Inactive)
-                    </p>
-                    <p style="margin: 0; font-size: 13px;">
-                        กรุณาติ๊กเลือก "Is active" ในรายการด้านล่าง เพื่อเปิดใช้งานระบบ AI
-                    </p>
-                {% endif %}
+                <div>
+                    {% if active_config %}
+                        <h3 class="model-name">
+                            {{ active_config.current_model.name }}
+                            <span style="font-size: 0.8em; color: #10b981; margin-left:10px;">(Active)</span>
+                        </h3>
+                        
+                        <div class="status-text">
+                            {% if active_config.last_status_ok %}
+                                <span class="status-badge badge-success">
+                                    <span class="pulsing-dot" style="margin-right: 8px;"></span>
+                                    API Connected
+                                </span>
+                            {% else %}
+                                <span class="status-badge badge-error">
+                                    ❌ Connection Failed
+                                </span>
+                            {% endif %}
+
+                            <span style="color:#9ca3af; font-size:0.8rem; margin-left: 10px;">
+                                <i class="fas fa-clock"></i> Updated: Just now
+                            </span>
+                        </div>
+                    {% else %}
+                        <h3 class="model-name" style="color: #ef4444;">System Offline</h3>
+                        <p class="status-text">
+                            ยังไม่ได้เลือกโมเดล AI สำหรับใช้งาน กรุณาตั้งค่า 'Is Active' ด้านล่าง
+                        </p>
+                    {% endif %}
+                </div>
             </div>
 
             {% if active_config %}
             <div>
-                <a href="{{ active_config.pk }}/change/" class="button" style="background-color: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
-                    ⚙️ ตั้งค่า / ทดสอบ
+                <a href="{{ active_config.pk }}/change/" class="btn-config">
+                    ⚙️ ตั้งค่า / ทดสอบโมเดล
                 </a>
             </div>
             {% endif %}
+
         </div>
     </div>
 

@@ -3,105 +3,91 @@
 
 {% block extrahead %}
     {{ block.super }}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
     <style>
-        /* 1. คุมโทน Font และพื้นหลัง */
         body, .content-wrapper { 
             font-family: 'Kanit', sans-serif !important; 
-            background-color: #f4f6f9 !important; 
-        }
-
-        /* 2. แต่ง Card ให้ดู "ลอย" และ "มน" (สไตล์ที่คุณต้องการ) */
-        .custom-stat-card {
-            background: #fff;
-            border-radius: 1.5rem !important; /* มนพิเศษ */
-            border: none !important;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important; /* เงาฟุ้งๆ ดูแพง */
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            height: 100%;
+            background-color: #f8fafc !important;
         }
         
-        .custom-stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+        #custom-dashboard-wrapper {
+             display: block; 
+             margin-bottom: 20px;
         }
 
-        /* 3. จัดการ Icon ให้ดู Modern */
-        .icon-box {
-            width: 55px;
-            height: 55px;
-            border-radius: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 1rem;
-            font-size: 1.5rem;
+        /* --- [ส่วนที่เพิ่ม] แก้ระยะห่างปุ่มในตาราง Jazzmin --- */
+        /* เลือกปุ่ม .btn ทุกตัวที่อยู่ในตาราง (.table) */
+        .content-wrapper .table td .btn {
+            margin-right: 10px !important; /* ดันปุ่มขวาออก 10px (เทียบเท่า class mr-2 ของ Bootstrap) */
+            margin-bottom: 5px !important; /* เผื่อกรณีจอเล็กแล้วปุ่มตกบรรทัด */
         }
-
-        /* 4. สีประจำหมวด (ดึงมาจาก Code สีที่คุณให้มา) */
-        .bg-blue-soft { background-color: #eef2ff; color: #5651FF; }
-        .bg-green-soft { background-color: #ecfdf5; color: #10b981; }
-        .bg-orange-soft { background-color: #fff7ed; color: #FF920D; }
-        .bg-red-soft { background-color: #fef2f2; color: #ef4444; }
-
-        .stat-label { color: #8e8e8e; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-        .stat-value { color: #1a1a1a; font-size: 1.75rem; font-weight: 800; line-height: 1; }
+        
+        /* ลบ margin ของปุ่มสุดท้ายในช่องนั้นๆ เพื่อความเป๊ะ */
+        .content-wrapper .table td .btn:last-child {
+            margin-right: 0 !important;
+        }
     </style>
 {% endblock %}
 
 {% block content %}
     {% get_summary_stats as stats %}
 
-    <div class="container-fluid">
-        <div class="row mb-4">
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="custom-stat-card">
-                    <div class="icon-box bg-blue-soft"><i class="fas fa-user-graduate"></i></div>
-                    <div>
-                        <div class="stat-label">Students</div>
-                        <div class="stat-value">{{ stats.students }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="custom-stat-card">
-                    <div class="icon-box bg-green-soft"><i class="fas fa-chalkboard-teacher"></i></div>
-                    <div>
-                        <div class="stat-label">Teachers</div>
-                        <div class="stat-value">{{ stats.teachers }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="custom-stat-card" style="border: 2px solid #5651FF1a !important;">
-                    <div class="icon-box" style="background-color: #5651FF; color: white;"><i class="fas fa-school"></i></div>
-                    <div>
-                        <div class="stat-label" style="color: #5651FF;">Active Rooms</div>
-                        <div class="stat-value">{{ stats.rooms }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="custom-stat-card">
-                    <div class="icon-box bg-red-soft"><i class="fas fa-book"></i></div>
-                    <div>
-                        <div class="stat-label">Assignments</div>
-                        <div class="stat-value">{{ stats.assignments }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div id="custom-dashboard-wrapper">
         
-        <div class="row">
-            <div class="col-12">
-                {{ block.super }}
+        <div style="margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
+            <h2 style="font-weight: 600; color: #1e293b; margin: 0; font-size: 1.5rem;">
+                👋 สวัสดี, {{ user.get_username }}
+            </h2>
+            <span style="color: #64748b; font-size: 0.9rem;">Overview of your system</span>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="custom-stat-card theme-blue">
+                <div class="stat-icon-box"><i class="fas fa-user-graduate"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Students</div>
+                    <div class="stat-value">{{ stats.students }}</div>
+                </div>
+            </div>
+
+            <div class="custom-stat-card theme-green">
+                <div class="stat-icon-box"><i class="fas fa-chalkboard-teacher"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Teachers</div>
+                    <div class="stat-value">{{ stats.teachers }}</div>
+                </div>
+            </div>
+
+            <div class="custom-stat-card special-card">
+                <div class="stat-icon-box"><i class="fas fa-school"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Active Rooms</div>
+                    <div class="stat-value">{{ stats.rooms }}</div>
+                </div>
+            </div>
+
+            <div class="custom-stat-card theme-red">
+                <div class="stat-icon-box"><i class="fas fa-book"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">Assignments</div>
+                    <div class="stat-value">{{ stats.assignments }}</div>
+                </div>
             </div>
         </div>
     </div>
+
+    {{ block.super }}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const dashboard = document.getElementById('custom-dashboard-wrapper');
+            const contentMain = document.getElementById('content-main') || document.querySelector('.content');
+            
+            if (dashboard && contentMain) {
+                contentMain.prepend(dashboard);
+            }
+        });
+    </script>
 {% endblock %}

@@ -6,26 +6,53 @@ from django.contrib.auth.hashers import make_password
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 from import_export.widgets import CharWidget
+# เพิ่มบรรทัดนี้เพื่อดึง Format XLSX มาใช้
+from import_export.formats import base_formats 
+
 from .models import User, Students, Teachers 
 
 # ---------------------------------------------------------
-# ส่วนที่ 1: UserResource 
+# ส่วนที่ 1: UserResource (Logic เดิมทั้งหมด ไม่มีการแก้ไข)
 # ---------------------------------------------------------
 class UserResource(resources.ModelResource):
     
-    # รับค่า 'id' จาก Excel
+    # ... (ส่วนประกาศ field เหมือนเดิม) ...
     personal_id = fields.Field(attribute='personal_id', column_name='id', widget=CharWidget())
-    
-    # รับค่า 'password'
     password = fields.Field(attribute='password', column_name='password', widget=CharWidget())
 
     class Meta:
         model = User
-        # ระบุ field ที่จะให้บันทึกลง DB (ไม่ต้องมี full_name_temp)
+        # ✅ ต้องเก็บ 'password' ไว้ที่นี่ เพื่อให้ Import (Add User) ทำงานได้
         fields = ('email', 'first_name', 'last_name', 'role', 'personal_id', 'password', 'is_active')
         import_id_fields = ('email',) 
         skip_unchanged = True
+    
+    def skip_row(self, instance, original, row, import_validation_errors=None):
+        # 1. ดึงค่า email มาเช็ค
+        email = row.get('email')
 
+        # 2. ถ้าเป็นค่าว่าง (None) หรือเป็น Empty String ("") ให้ข้ามเลย
+        if email is None:
+            return True
+        
+        # 3. กันเหนียว: ถ้าแปลงเป็น string แล้วว่าง หรือเป็นคำว่า 'none' ให้ข้าม
+        email_str = str(email).strip().lower()
+        if not email_str or email_str == 'none':
+            return True
+
+        password = row.get('password')
+        
+        # แปลงเป็น string และเช็คเหมือน email
+        password_str = str(password).strip().lower() if password is not None else ""
+        
+        # ถ้าไม่มี password หรือเป็นคำว่า 'none' -> ข้าม (SKIP)
+        # เพราะ User ต้องมีรหัสผ่านถึงจะสร้างได้
+        if not password_str or password_str == 'none':
+            return True
+
+        return super().skip_row(instance, original, row, import_validation_errors)
+
+    # ... (def before_import_row เหมือนเดิม) ...
     def before_import_row(self, row, **kwargs):
         # 1. จัดการ Email
         email = str(row.get('email', '')).strip().lower()
@@ -61,15 +88,9 @@ class UserResource(resources.ModelResource):
 
         row['is_active'] = True 
 
-    # -----------------------------------------------------------
-    # จุดที่แก้คือบรรทัดนี้ครับ 👇 (เติม **kwargs เข้าไป)
-    # -----------------------------------------------------------
+    # ... (def after_save_instance เหมือนเดิม) ...
     def after_save_instance(self, instance, row=None, **kwargs):
-        """ สร้าง Profile นักเรียน/อาจารย์ หลังจาก User บันทึกเสร็จแล้ว """
-        
-        # ดึงค่า dry_run มาจาก kwargs แทนการรับตรงๆ
         dry_run = kwargs.get('dry_run', False)
-        
         if dry_run: return 
 
         full_name_str = f"{instance.first_name} {instance.last_name}".strip()
@@ -77,22 +98,30 @@ class UserResource(resources.ModelResource):
         if instance.role == "STUDENT":
             Teachers.objects.filter(user=instance).delete()
             Students.objects.update_or_create(user=instance, defaults={"name": full_name_str})
-            
         elif instance.role == "TEACHER":
             Students.objects.filter(user=instance).delete()
             Teachers.objects.update_or_create(user=instance, defaults={"name": full_name_str})
-            
         else: # ADMIN
             Students.objects.filter(user=instance).delete()
             Teachers.objects.filter(user=instance).delete()
 
+    # ⭐ เพิ่มฟังก์ชันนี้เข้าไปครับ: เพื่อซ่อนรหัสผ่านตอน Export
+    def dehydrate_password(self, user):
+        return ""  # ส่งค่าว่างกลับไปแทน Hash ยาวๆ
+
 
 # ---------------------------------------------------------
-# ส่วนที่ 2: UserAdmin
+# ส่วนที่ 2: UserAdmin (เพิ่มการจำกัด Format XLSX)
 # ---------------------------------------------------------
 @admin.register(User)
 class UserAdmin(ImportExportModelAdmin, BaseUserAdmin):
     resource_class = UserResource
+
+    # --- ส่วนที่เพิ่มเข้ามาใหม่ ---
+    def get_import_formats(self):
+        """ บังคับให้ Import ได้เฉพาะไฟล์ .xlsx เท่านั้น """
+        return [base_formats.XLSX]
+    # -------------------------
 
     list_display = ("email", "first_name", "last_name", "personal_id", "role", "is_active")
     list_filter = ("role", "is_active")
@@ -112,11 +141,13 @@ class UserAdmin(ImportExportModelAdmin, BaseUserAdmin):
         }),
     )
 
+# ---------------------------------------------------------
+# ส่วนที่ 3: Students & Teachers Admin (เหมือนเดิม)
+# ---------------------------------------------------------
 @admin.register(Students)
 class StudentsAdmin(admin.ModelAdmin):
     list_display = ('name', 'get_user_email', 'get_student_id')
     search_fields = ('name', 'user__email', 'user__personal_id')
-    # เพื่อให้กรองตามห้องเรียนได้
     list_filter = ('joined_rooms',) 
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* ล้างสไตล์เดิมของ AdminLTE ที่ทำให้ Layout พัง */
+        /* ล้างสไตล์เดิมของ AdminLTE */
         body.login-page { 
             background: #F5F5F5 !important; 
             font-family: 'Kanit', sans-serif !important;
@@ -19,14 +19,45 @@
             margin: 0;
             overflow: hidden;
         }
-        /* บังคับซ่อนส่วนประกอบเดิมของ Jazzmin ทั้งหมด */
+        
+        /* บังคับซ่อนส่วนประกอบเดิมของ Jazzmin */
         .login-box { width: 100% !important; max-width: none !important; margin: 0 !important; background: transparent !important; }
         .login-box .card { background: transparent !important; border: none !important; box-shadow: none !important; }
         .login-logo, .login-box-msg { display: none !important; }
         
-        /* แก้ปัญหา Input ลอยซ้อนกัน */
         .input-group { margin-bottom: 0 !important; display: block !important; }
-        .form-control { position: static !important; }
+        
+        /* แก้ไขให้ Input ทั้งหมดมีขนาดเท่ากัน และแก้ปัญหาตัวอักษรทับไอคอน */
+        .custom-input {
+            width: 100% !important;
+            height: 50px !important; 
+            box-sizing: border-box !important; 
+            position: relative !important;
+            display: block !important;
+            /* เพิ่ม Padding Left ตรงนี้เพื่อกันตัว Jazzmin มาเขียนทับ */
+            padding-left: 3.2rem !important; 
+            border-radius: 0.75rem !important;
+            border: 1px solid #e5e7eb !important;
+            background-color: #f9fafb !important;
+        }
+
+        .custom-input:focus {
+            outline: none !important;
+            border-color: #5651FF !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 0 0 4px rgba(86, 81, 255, 0.05) !important;
+        }
+
+        /* จัดตำแหน่ง Icon ให้แม่นยำขึ้น */
+        .input-icon {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 50;
+            color: #9ca3af;
+            pointer-events: none;
+        }
     </style>
 {% endblock %}
 
@@ -47,7 +78,7 @@
                 </div>
 
                 {% if form.errors %}
-                <div class="flex items-center gap-3 p-4 text-sm rounded-2xl bg-red-50 text-red-600 mb-6">
+                <div class="flex items-center gap-3 p-4 text-sm rounded-2xl bg-red-50 text-red-600 mb-6 border border-red-100">
                     <i class="fas fa-circle-info"></i>
                     <span class="font-medium">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</span>
                 </div>
@@ -58,36 +89,36 @@
 
                     <div class="space-y-2">
                         <label class="block px-1 text-sm font-semibold text-gray-600">ชื่อผู้ใช้งาน</label>
-                        <div class="relative flex items-center"> <span class="absolute left-4 z-20 text-gray-400 pointer-events-none">
+                        <div class="relative">
+                            <span class="input-icon">
                                 <i class="far fa-user text-sm"></i>
                             </span>
                             <input type="text" name="username" autofocus required
-                                class="block w-full h-12 pl-12 pr-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#5651FF] focus:ring-4 focus:ring-[#5651FF]/5 transition-all text-gray-900 shadow-sm !m-0 !p-0 !pl-12" 
-                                placeholder="Username" 
-                                style="position: relative !important;"> </div>
+                                class="custom-input" 
+                                placeholder="Username">
+                        </div>
                     </div>
 
                     <div class="space-y-2">
                         <label class="block px-1 text-sm font-semibold text-gray-600">รหัสผ่าน</label>
-                        <div class="relative flex items-center">
-                            <span class="absolute left-4 z-20 text-gray-400 pointer-events-none">
+                        <div class="relative">
+                            <span class="input-icon">
                                 <i class="fas fa-key text-xs"></i>
                             </span>
                             <input type="password" name="password" required
-                                class="block w-full h-12 pl-12 pr-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#5651FF] focus:ring-4 focus:ring-[#5651FF]/5 transition-all text-gray-900 shadow-sm !m-0 !p-0 !pl-12" 
-                                placeholder="••••••••"
-                                style="position: relative !important;">
+                                class="custom-input" 
+                                placeholder="••••••••">
                         </div>
                     </div>
 
                     <button type="submit"
-                        class="w-full h-12 bg-[#5651FF] hover:bg-[#4843E6] rounded-xl text-white text-base font-bold shadow-md shadow-[#5651FF]/20 hover:shadow-lg active:scale-[0.98] transition-all duration-200 mt-4 flex items-center justify-center group">
+                        class="w-full h-12 bg-[#5651FF] hover:bg-[#4843E6] rounded-xl text-white text-base font-bold shadow-md shadow-[#5651FF]/20 hover:shadow-lg active:scale-[0.98] transition-all duration-200 mt-4 flex items-center justify-center group border-none">
                         <span>เข้าสู่ระบบจัดการ</span>
                         <i class="fas fa-sign-in-alt ml-2 group-hover:translate-x-1 transition-transform"></i>
                     </button>
                 </form>
 
-                <div class="mt-10 pt-6 border-t border-gray-50 text-center">
+                <div class=" pt-6 border-t border-gray-50 text-center">
                     <a href="/" class="text-xs font-bold text-gray-400 hover:text-[#5651FF] transition-colors inline-flex items-center gap-2">
                          <i class="fas fa-arrow-left text-[10px]"></i> กลับสู่เว็บไซต์หลัก
                     </a>

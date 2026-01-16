@@ -220,3 +220,68 @@ def notify_new_announcement(sender, instance, created, **kwargs):
         if notification_list:
             Notification.objects.bulk_create(notification_list)
             print(f"🔔 Created {len(notification_list)} notifications for new announcement in {room.name}")
+
+@receiver(post_save, sender='room.Submission')
+def notify_teacher_all_submitted(sender, instance, created, **kwargs):
+    """
+    ทำงานเมื่อมีการส่งงาน ตรวจสอบว่าส่งครบทุกคนหรือยัง
+    ถ้าครบแล้ว -> แจ้งเตือนอาจารย์เจ้าของห้อง และอาจารย์ผู้ช่วยทุกคน
+    """
+    submission = instance
+    assignment = submission.assignment
+    room = assignment.room
+    
+    # 1. รวบรวมรายชื่ออาจารย์ที่จะได้รับแจ้งเตือน (แบบไม่ซ้ำคน)
+    recipients = set()
+    
+    # เพิ่มอาจารย์เจ้าของห้อง (owner)
+    if room.owner:
+        recipients.add(room.owner)
+        
+    # เพิ่มอาจารย์ผู้ช่วยทุกคน (teachers)
+    for teacher_profile in room.teachers.all():
+        if teacher_profile.user:
+            recipients.add(teacher_profile.user)
+
+    if not recipients:
+        return
+
+    # 2. นับจำนวนนักเรียนทั้งหมดในห้อง
+    total_students = room.students.count()
+
+    # 3. นับจำนวนคนที่ส่งงานชิ้นนี้แล้ว (นับแบบไม่ซ้ำคน)
+    SubmissionModel = sender 
+    submitted_count = SubmissionModel.objects.filter(assignment=assignment).values('student').distinct().count()
+
+    # 4. เงื่อนไข: ถ้าส่งครบ (จำนวนคนส่ง >= จำนวนนักเรียน) และต้องมีนักเรียนในห้องจริง
+    if total_students > 0 and submitted_count >= total_students:
+        
+        teacher_link = f"/teacher/assignment/{assignment.id}/grading/" 
+        message_text = f"ครบ {total_students} คนแล้ว! สำหรับงาน '{assignment.title}' ในห้อง {room.name}"
+
+        notification_list = []
+        
+        for teacher_user in recipients:
+            # 5. เช็คว่าเคยแจ้งเตือนอาจารย์คนนี้เรื่องงานชิ้นนี้ไปหรือยัง (ป้องกันซ้ำ)
+            already_notified = Notification.objects.filter(
+                recipient=teacher_user,
+                message=message_text,
+                room=room,
+                is_read=False
+            ).exists()
+
+            if not already_notified:
+                notification_list.append(
+                    Notification(
+                        recipient=teacher_user,
+                        message=message_text,
+                        link=teacher_link,
+                        room=room,
+                        is_read=False
+                    )
+                )
+
+        # 6. บันทึกแจ้งเตือนทั้งหมดลงฐานข้อมูลครั้งเดียว
+        if notification_list:
+            Notification.objects.bulk_create(notification_list)
+            print(f"🔔 Alerted {len(notification_list)} teachers: All students submitted for {assignment.title}")

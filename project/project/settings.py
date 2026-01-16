@@ -139,6 +139,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
 AUTH_USER_MODEL = "users.User"
 
 TEMPLATES[0]["DIRS"] = [BASE_DIR / "templates"]
@@ -181,7 +185,7 @@ JAZZMIN_SETTINGS = {
 
     # --- ส่วนสำคัญสำหรับการใช้ Custom CSS ---
     # ชี้ไปยังไฟล์ CSS ที่คุณจะสร้าง (สมมติว่าอยู่ที่ static/admin/css/custom_admin.css)
-
+    "custom_css": "css/custom_admin.css",
     # ---------------------------------------
 
     # 2. จัดลำดับแอป

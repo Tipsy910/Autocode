@@ -14,7 +14,7 @@
         <div class="flex gap-3 items-center w-full md:w-auto">
             <form method="GET" action="" id="filterForm" class="flex-grow md:flex-grow-0">
                 <select name="room" onchange="document.getElementById('filterForm').submit()"
-                    class="select select-bordered select-sm w-full md:w-48 border-gray-300 focus:border-[#5651FF] focus:ring-[#5651FF]">
+                    class="select select-bordered select-sm w-full md:w-48 border-gray-300 focus:border-[#5651FF] focus:ring-[#5651FF] rounded-full">
                     <option value="" {% if not selected_room_id %}selected{% endif %}>ทุกห้องเรียน</option>
                     {% for room in student_rooms %}
                     <option value="{{ room.id }}" {% if selected_room_id == room.id %}selected{% endif %}>
@@ -27,7 +27,7 @@
             <form method="POST" action="{% url 'notifications:mark_all_read' %}">
                 {% csrf_token %}
                 <button type="submit" 
-                    class="btn btn-sm bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all active:scale-95 shadow-sm">
+                    class="btn btn-sm bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all active:scale-95 shadow-sm rounded-full">
                     <i class="fas fa-check-double mr-1 text-[#00964F]"></i> <span class="hidden sm:inline">อ่านครบทั้งหมด</span>
                 </button>
             </form>
@@ -41,22 +41,32 @@
             
             <div class="flex items-start gap-4">
                 <div class="flex-shrink-0 mt-1">
+                    
                     {% if 'งานใหม่' in notif.message or 'New Assignment' in notif.message %}
                     <div class="w-10 h-10 rounded-full bg-[#5651FF] text-white flex items-center justify-center shadow-md">
                         <i class="fas fa-book"></i>
                     </div>
+
                     {% elif 'ผ่านแล้ว' in notif.message or 'PASSED' in notif.message %}
                     <div class="w-10 h-10 rounded-full bg-[#00964F] text-white flex items-center justify-center shadow-md">
                         <i class="fas fa-check"></i>
                     </div>
+
                     {% elif 'แก้ไข' in notif.message or 'REJECT' in notif.message %}
                     <div class="w-10 h-10 rounded-full bg-[#D3302F] text-white flex items-center justify-center shadow-md">
                         <i class="fas fa-exclamation"></i>
                     </div>
+                    
+                    {% elif 'ครบ' in notif.message or 'Submitted' in notif.message %}
+                    <div class="w-10 h-10 rounded-full bg-[#8b5cf6] text-white flex items-center justify-center shadow-md">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+
                     {% elif 'ประกาศ' in notif.message or 'Announcement' in notif.message %}
                     <div class="w-10 h-10 rounded-full bg-[#FFB01D] text-white flex items-center justify-center shadow-md">
                         <i class="fas fa-bullhorn"></i>
                     </div>
+
                     {% else %}
                     <div class="w-10 h-10 rounded-full bg-[#FF7E00] text-white flex items-center justify-center shadow-md">
                         <i class="fas fa-info"></i>
@@ -93,7 +103,9 @@
                 <i class="far fa-bell-slash text-5xl text-gray-200"></i>
             </div>
             <h3 class="text-xl font-bold text-gray-800">ไม่มีการแจ้งเตือน</h3>
-            <p class="text-gray-400 mt-1">{% if selected_room_id %}สำหรับห้องเรียนนี้ยังไม่มีการแจ้งเตือนใหม่{% else %}คุณอ่านครบทุกรายการแล้ว{% endif %}</p>
+            <p class="text-gray-400 mt-1">
+                {% if selected_room_id %}สำหรับห้องเรียนนี้ยังไม่มีการแจ้งเตือนใหม่{% else %}คุณอ่านครบทุกรายการแล้ว{% endif %}
+            </p>
         </div>
         {% endfor %}
     </div>

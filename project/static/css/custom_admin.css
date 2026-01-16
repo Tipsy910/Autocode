@@ -1,0 +1,606 @@
+/* ==========================================================================
+   1. GLOBAL & CONTAINER STYLES (โครงสร้างหลักและการ์ด)
+   ========================================================================== */
+:root {
+    /* นิยามตัวแปรสีตามที่ระบุมา เพื่อให้เรียกใช้ง่าย */
+    --c-primary:   #5651FF;
+    --c-secondary: #FF7E00;
+    --c-accent:    #FFB01D;
+    --c-neutral:   #1A1A1A;
+    --c-base-100:  #FFFFFF;
+    --c-base-200:  #F5F5F5;
+    --c-info:      #3ABFF8;
+    --c-success:   #00964F;
+    --c-warning:   #FFB01D;
+    --c-error:     #D3302F;
+}
+/* ปรับแต่งกล่อง Card พื้นฐานของ Django Admin ให้มนและนูนสวย */
+.card {
+    border: none !important;
+    border-radius: 1rem !important; /* มุมมนมาก (ประมาณ 16px) */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    margin-bottom: 25px;
+    overflow: hidden !important; /* ตัดเนื้อหาที่เกินมุมมนทิ้ง */
+}
+
+/* ==========================================================================
+   2. DASHBOARD STYLES (ส่วนแสดงผลกราฟและสถิติ)
+   ========================================================================== */
+
+/* จัดระเบียบ Grid Layout ของ Dashboard */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); /* ปรับคอลัมน์อัตโนมัติ */
+    gap: 30px;
+    margin-bottom: 40px;
+    padding: 10px 5px;
+    width: 100%;
+}
+
+/* กล่องคลุม Dashboard (ใช้สำหรับ JS ย้ายตำแหน่ง) */
+#custom-dashboard-wrapper {
+    margin-bottom: 30px;
+    display: block;
+}
+
+/* ดีไซน์ตัวการ์ดสถิติ (Stat Card) */
+.custom-stat-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 25px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0,0,0,0.02);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.custom-stat-card:hover {
+    transform: translateY(-5px); /* ลอยขึ้นเมื่อเอาเมาส์ชี้ */
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+}
+
+/* กล่องไอคอนในการ์ด */
+.stat-icon-box {
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-right: 20px;
+    flex-shrink: 0;
+}
+
+/* ส่วนข้อความในการ์ด */
+.stat-content { flex-grow: 1; }
+
+.stat-label {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    color: #111827;
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* ธีมสีของการ์ด (Themes) */
+.theme-blue .stat-icon-box { background-color: #eff6ff; color: #3b82f6; }
+.theme-green .stat-icon-box { background-color: #ecfdf5; color: #10b981; }
+.theme-orange .stat-icon-box { background-color: #fff7ed; color: #f97316; }
+.theme-red .stat-icon-box { background-color: #fef2f2; color: #ef4444; }
+
+/* การ์ดพิเศษ (Active Room) */
+.custom-stat-card.special-card {
+    border: 2px solid rgba(86, 81, 255, 0.2);
+    background: linear-gradient(145deg, #ffffff 0%, #f5f7ff 100%);
+}
+.custom-stat-card.special-card .stat-icon-box {
+    background-color: #5651FF;
+    color: white;
+    box-shadow: 0 4px 10px rgba(86, 81, 255, 0.3);
+}
+.custom-stat-card.special-card .stat-label { color: #5651FF; }
+
+
+/* ==========================================================================
+   3. TABLE STYLES (ตารางแสดงข้อมูล)
+   ========================================================================== */
+
+/* หัวตาราง (Thead) */
+.table thead th {
+    background-color: #ffffff !important;
+    color: #4b5563;
+    border-bottom: 2px solid #e5e7eb !important;
+    border-top: none !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    padding: 1.25rem 1rem !important;
+}
+
+/* แถวข้อมูล (Rows) */
+.table tbody td {
+    border-top: 1px solid #f3f4f6 !important;
+    padding: 1.25rem 1rem !important;
+    vertical-align: middle !important;
+    color: #1f2937;
+    font-size: 0.875rem;
+}
+
+/* ลบสีพื้นหลังของแถวสลับ (Striped) ออก */
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: transparent !important;
+}
+
+/* Hover Effect ของแถว */
+.table tbody tr:hover {
+    background-color: #f9fafb !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Checkbox ในตาราง */
+.action-checkbox input {
+    cursor: pointer;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 0.25rem;
+}
+
+
+/* ==========================================================================
+   4. FORMS, INPUTS & SEARCH BAR (ฟอร์มและช่องค้นหา)
+   ========================================================================== */
+
+/* ปรับ Input ทั่วไปให้กลมมน */
+.form-control, select {
+    border-radius: 9999px !important;
+    border: 1px solid #d1d5db !important;
+    padding: 0.5rem 1.25rem !important;
+    box-shadow: none !important;
+    font-size: 0.875rem !important;
+}
+
+.form-control:focus, select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* --- Search Bar Styling (ช่องค้นหาด้านบน) --- */
+.navbar-nav form, 
+.navbar-nav .input-group,
+.top-navbar .input-group {
+    margin-right: 20px !important;
+    margin-left: 5px !important;
+    align-items: center;
+}
+
+/* ช่องกรอกคำค้นหา */
+.input-group .form-control {
+    border-radius: 20px !important;
+    background-color: #f9fafb !important;
+    margin-right: 8px !important;
+    height: 38px !important;
+    padding-left: 15px !important;
+}
+
+/* ปุ่มแว่นขยาย */
+.input-group .btn {
+    border-radius: 50% !important; /* วงกลม */
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    min-width: 38px !important;
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #6b7280 !important;
+    margin-left: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+
+.input-group .btn:hover {
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+    background-color: #eff6ff !important;
+}
+
+/* --- File Upload Styling (ช่องอัปโหลดไฟล์) --- */
+input[type="file"] {
+    background-color: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    width: 100%;
+    cursor: pointer;
+    color: #4b5563;
+    transition: all 0.2s ease;
+}
+input[type="file"]:hover {
+    background-color: #f3f4f6;
+    border-color: #3b82f6;
+}
+input[type="file"]::file-selector-button {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: none;
+    padding: 0.5rem 1.25rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    margin-right: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+input[type="file"]::file-selector-button:hover {
+    background-color: #1d4ed8;
+}
+
+
+/* ==========================================================================
+   5. TOP ACTION BUTTONS (ปุ่มด้านขวาบน Add, Import, Export)
+   ========================================================================== */
+
+/* ปุ่มทั่วไป */
+.btn {
+    border-radius: 9999px !important;
+    font-weight: 500;
+    padding: 0.5rem 1.5rem !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    text-transform: none !important;
+}
+
+.btn-primary {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+}
+.btn-primary:hover {
+    background-color: #1d4ed8 !important;
+}
+
+/* จัดระยะห่างของปุ่ม Action Tools */
+.object-tools a, 
+.object-tools .btn,
+.page-actions .btn,
+.page-header .btn { 
+    margin-left: 10px !important;
+    margin-bottom: 5px !important;
+    float: none !important;
+}
+
+/* ปรับสีปุ่ม Import/Export ให้เป็นสีขาวขอบเทา */
+a.import_link, a.export_link {
+    background-color: #ffffff !important;
+    color: #4b5563 !important;
+    border: 1px solid #d1d5db !important;
+}
+a.import_link:hover, a.export_link:hover {
+    background-color: #f3f4f6 !important;
+}
+
+
+/* ==========================================================================
+   6. SIDEBAR / SUBMIT BUTTONS (ปุ่มบันทึกด้านขวา/ล่าง)
+   ========================================================================== */
+
+/* จัด Layout แนวตั้ง */
+.submit-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+    align-items: stretch !important;
+}
+
+/* ปรับทุกปุ่มใน Sidebar ให้หน้าตาเหมือนกัน (Save, Delete, History, Test) */
+.submit-row input, 
+.submit-row a.historylink, 
+.submit-row a.deletelink {
+    display: block !important;
+    width: 100% !important;
+    height: 45px !important;        /* ความสูงเท่ากัน */
+    line-height: 45px !important;   /* จัดกลางแนวตั้ง */
+    box-sizing: border-box !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    float: none !important;
+    border-radius: 9999px !important; /* แคปซูล */
+    text-align: center !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    text-transform: uppercase !important;
+    text-decoration: none !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease;
+}
+
+/* --- สีของแต่ละปุ่ม --- */
+
+/* Save (เขียว) */
+.submit-row input[name="_save"] {
+    background-color: #10b981 !important;
+    color: white !important;
+}
+
+/* Save and add another (ฟ้า) */
+.submit-row input[name="_addanother"] {
+    background-color: #0ea5e9 !important;
+    color: white !important;
+}
+
+/* Save and continue (ฟ้าเข้ม) */
+.submit-row input[name="_continue"] {
+    background-color: #0284c7 !important;
+    color: white !important;
+}
+
+/* Delete (แดง) */
+.submit-row p.deletelink-box { display: none; }
+.submit-row a.deletelink {
+    background-color: #ef4444 !important;
+    color: white !important;
+}
+
+/* History (เทา) */
+.submit-row a.historylink {
+    background-color: #6b7280 !important;
+    color: white !important;
+}
+
+/* Test Connection (ม่วง - ปุ่มพิเศษที่เราเพิ่มเอง) */
+.submit-row input.btn-test-connection {
+    background-color: #8b5cf6 !important;
+    color: white !important;
+    box-shadow: 0 4px 6px rgba(139, 92, 246, 0.25) !important;
+}
+
+/* Hover Effect รวมทุกปุ่ม */
+.submit-row input:hover,
+.submit-row a:hover {
+    filter: brightness(90%);
+    transform: translateY(-1px);
+}
+
+.submit-row input.btn-test-connection:hover {
+    background-color: #7c3aed !important;
+    box-shadow: 0 6px 12px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* ==========================================================================
+   7. FILTER HORIZONTAL (ฉบับแก้ไข: ลบกรอบปุ่ม + เพิ่มความเข้มลูกศร)
+   ========================================================================== */
+
+/* 1. ปรับโครงสร้างหลัก */
+.selector {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 5px !important;
+}
+
+/* 2. กล่องซ้าย-ขวา */
+.selector .selector-available, 
+.selector .selector-chosen {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 44% !important;
+    height: 500px !important;
+    border: none !important;
+    background: var(--c-base-100);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08); 
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+
+/* 3. หัวข้อกล่อง */
+.selector h2 {
+    background: var(--c-primary) !important;
+    color: white !important;
+    padding: 12px 15px !important;
+    font-size: 15px !important;
+    margin: 0 !important;
+}
+.selector .selector-chosen h2 { background: var(--c-success) !important; }
+
+/* 4. รายชื่อ (Select) */
+.selector select {
+    flex-grow: 1 !important;
+    background: white !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
+/* 5. จัดระเบียบกลุ่มลูกศรตรงกลาง */
+.selector ul.selector-chooser {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 10% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 30px !important; /* เพิ่มระยะห่างให้ดูโปร่ง */
+    background-color: transparent !important;
+}
+
+.selector .selector-chooser li {
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 6. แก้ไขดีไซน์ปุ่ม (ลบกรอบขาวเทาออกให้หมดเหลือแต่ลูกศร) */
+.selector .selector-add, 
+.selector .selector-remove {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    
+    width: 50px !important;
+    height: 50px !important;
+    
+    /* ลบกรอบและพื้นหลังทิ้ง */
+    background: none !important; 
+    border: none !important;
+    box-shadow: none !important;
+    
+    cursor: pointer !important;
+    position: relative !important;
+    overflow: visible !important;
+    
+    /* ซ่อนตัวหนังสือเดิม */
+    font-size: 0 !important;
+    color: transparent !important;
+}
+
+/* 7. ใส่ลูกศรใหม่ (เน้นสีชัด + เงาคม) */
+
+
+.selector .selector-add::after,
+.selector .selector-remove::after {
+    display: block !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    font-size: 40px !important; /* ขยายขนาดลูกศรให้เด่น */
+    text-indent: 0 !important;
+    visibility: visible !important;
+    transition: all 0.2s ease;
+    
+    /* เพิ่มความชัดของสี */
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.selector .selector-add::after {
+    content: "➤" !important;
+    color: var(--c-primary) !important; /* สีน้ำเงินสด (Primary) */
+}
+
+.selector .selector-remove::after {
+    content: "➤" !important;
+    color: var(--c-error) !important; /* สีแดงสด (Error) */
+    transform: translate(-50%, -50%) rotate(180deg) !important;
+}
+
+/* Hover Effect: ขยายใหญ่ขึ้นและสีเข้มขึ้น */
+.selector .selector-add:hover::after, 
+.selector .selector-remove:hover::after {
+    transform: translate(-50%, -50%) scale(1.2) !important;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+.selector .selector-remove:hover::after {
+    transform: translate(-50%, -50%) rotate(180deg) scale(1.2) !important;
+}
+
+/* 8. แถบปุ่ม Choose All / Clear All */
+.selector .selector-chooseall, 
+.selector .selector-clearall {
+    display: block !important;
+    width: 100% !important;
+    padding: 12px 0 !important;
+    text-align: center !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+}
+
+.selector .selector-chooseall {
+    background-color: #f0f7ff !important;
+    color: #2563eb !important;
+    border-top: 1px solid #dbeafe !important;
+}
+.selector .selector-clearall {
+    background-color: #fff5f5 !important;
+    color: #dc2626 !important;
+    border-top: 1px solid #fee2e2 !important;
+}
+
+/* คืนค่าภาษาไทย */
+.selector .selector-chooseall, .selector .selector-clearall { font-size: 0 !important; }
+.selector .selector-chooseall::before { content: "✚ เลือกทั้งหมด"; font-size: 13px !important; }
+.selector .selector-clearall::before { content: "✖ เอาออกทั้งหมด"; font-size: 13px !important; }
+
+
+/* ==========================================================================
+   8. FIX: IMPORT PREVIEW TABLE (แก้สีหน้า Import ให้เป็นธีมสว่าง - FINAL)
+   ========================================================================== */
+
+/* 1. รีเซ็ตตาราง Import Preview ทั้งหมด */
+table.import-preview {
+    background-color: #ffffff !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+}
+
+/* 2. หัวตาราง */
+table.import-preview thead th {
+    background-color: #ffffff !important;
+    color: #4b5563 !important;
+    border-bottom: 2px solid #e5e7eb !important;
+    padding: 12px !important;
+    text-transform: uppercase !important;
+    font-size: 0.75rem !important;
+}
+
+/* 3. จัดการแถวและตัวหนังสือ */
+table.import-preview td {
+    padding: 12px !important;
+    border-top: 1px solid #f3f4f6 !important;
+    /* color: inherit !important;  <-- ลบบรรทัดนี้ออก เพื่อให้สีตาม tag tr */
+}
+
+/* --- แยกสีตามสถานะ (Status Colors) --- */
+
+/* NEW - สีเขียว */
+table.import-preview tr.new {
+    background-color: #ecfdf5 !important;
+}
+table.import-preview tr.new td {
+    color: #0de45f !important;
+}
+
+/* UPDATE - สีส้ม */
+table.import-preview tr.update {
+    background-color: #fff7ed !important;
+}
+table.import-preview tr.update td {
+    color: #9a3412 !important;
+}
+
+/* SKIP / ERROR */
+table.import-preview tr.skip { background-color: #f3f4f6 !important; }
+table.import-preview tr.error { background-color: #fef2f2 !important; }
+table.import-preview tr.error td { color: #991b1b !important; }
+
+/* ==========================================================================
+   👇👇👇 ส่วนสำคัญที่แก้ปัญหาจอดำ (OVERRIDE DJANGO THEME) 👇👇👇
+   ========================================================================== */
+
+/* เจาะจงไปที่ tag <ins> และ <del> ที่อยู่ในตารางนี้ เพื่อล้างพื้นหลังสีดำออก */
+table.import-preview td ins,
+table.import-preview td del {
+    background-color: transparent !important; /* ล้างพื้นหลังสีดำ/สีธีมออก */
+    color: inherit !important; /* ให้สีตัวหนังสือตามสีของแถว (tr) */
+    text-decoration: none !important; /* ลบเส้นขีดเส้นใต้ */
+    border: none !important;
+    text-shadow: none !important;
+}

@@ -163,7 +163,7 @@ class AIConfigurationAdmin(admin.ModelAdmin):
     list_display = ('current_model', 'is_active', 'show_connection_status', 'last_checked_at')
     list_filter = ('is_active', 'last_status_ok')
     ordering = ('-is_active', '-updated_at')
-
+    
     # =========================================================
     # 2. View Overrides (ส่วนแทรกแซงการแสดงผลหน้าเว็บ)
     # =========================================================
@@ -207,23 +207,54 @@ class AIConfigurationAdmin(admin.ModelAdmin):
     # ฟังก์ชันช่วย Test Connection (Helper Function)
     def perform_test_and_save(self, request, obj):
         
+        # 1. ตรวจสอบว่าเลือก Model หรือยัง
         if not obj.current_model:
             self.message_user(request, "กรุณาเลือกโมเดลก่อนทดสอบ", level=messages.WARNING)
-            
-            return super().response_change(request, obj)
+            # กลับไปหน้าเดิม
+            return redirect(request.path)
 
+        # =====================================================
+        # ✅ [UPDATED] ดักจับว่าต้องเป็น Gemini เท่านั้น
+        # =====================================================
+        try:
+            # ดึงค่า api_value มาเช็ค (เช่น 'gemini-1.5-flash', 'gpt-4o')
+            # ใช้ .lower() เพื่อให้แน่ใจว่าตัวพิมพ์เล็ก/ใหญ่ไม่มีผล
+            model_val = obj.current_model.api_value.lower() if obj.current_model.api_value else ""
+            
+            if "gemini" not in model_val:
+                self.message_user(
+                    request, 
+                    f"⛔ ไม่สามารถทดสอบได้: ระบบปัจจุบันรองรับเฉพาะ Google Gemini แต่คุณเลือก '{obj.current_model.name}'", 
+                    level=messages.ERROR
+                )
+                # ดีดกลับไปหน้าเดิมทันที ไม่รัน test_ai_connection
+                return redirect(request.path)
+                
+        except AttributeError:
+            # เผื่อกรณี Model ไม่มี field api_value (กัน Error)
+            pass
+
+        # 2. รันการทดสอบ (ถ้าผ่านเงื่อนไข Gemini มาแล้ว)
+        # ส่ง API Key และ Model Name ไปเทส
         success, result_msg = test_ai_connection(obj.api_key, obj.current_model.api_value)
 
+        # 3. บันทึกผลลัพธ์ลง Database
         obj.last_status_ok = success
         obj.last_checked_at = timezone.now()
+        # ใช้ update_fields เพื่อ Save แค่ 2 คานี้ ไม่กระทบข้อมูลอื่น
         obj.save(update_fields=['last_status_ok', 'last_checked_at'])
 
+        # 4. ส่งข้อความแจ้งเตือน (Banner บนหน้าเว็บ)
         if success:
             self.message_user(request, f"✅ {obj.current_model.name}: {result_msg}", level=messages.SUCCESS)
         else:
             self.message_user(request, f"❌ {obj.current_model.name}: {result_msg}", level=messages.ERROR)
         
-        return super().response_change(request, obj)
+        # 5. Redirect กลับมาที่หน้า "แก้ไข" ของ object นี้
+        opts = obj._meta
+        change_url = reverse(f'admin:{opts.app_label}_{opts.model_name}_change', args=[obj.pk])
+        
+        return redirect(change_url)
 
     # =========================================================
     # 5. Display Methods (ส่วนตกแต่งตาราง)
@@ -245,3 +276,7 @@ class AIConfigurationAdmin(admin.ModelAdmin):
             )
     
     show_connection_status.short_description = "สถานะ API"
+
+    # แก้ไขชื่อฟังก์ชันที่พิมพ์ตกหล่น (tory_permission -> has_history_permission)
+    def has_history_permission(self, request, obj=None):
+        return False

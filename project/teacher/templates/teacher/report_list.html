@@ -70,10 +70,79 @@
                         </td>
 
                         <td class="py-4 px-6 text-center">
-                            <span
-                                class="inline-flex items-center px-4 py-1.5 bg-red-50 text-red-600 rounded-xl font-bold text-sm border border-red-100">
-                                {{ submission.report_reason|default:"- ไม่ระบุ -" }}
-                            </span>
+                            <button onclick="document.getElementById('modal_report_{{ submission.pk }}').showModal()"
+                                class="inline-flex items-center px-4 py-1.5 bg-red-50 text-red-600 rounded-xl font-bold text-sm border border-red-100 hover:bg-red-100 transition-all active:scale-95">
+                                <i class="fas fa-comment-dots mr-2"></i>
+                                อ่านปัญหาที่แจ้ง
+                            </button>
+
+                        <dialog id="modal_report_{{ submission.pk }}" class="modal modal-bottom sm:modal-middle backdrop-blur-sm transition-all">
+                            <div class="modal-box p-0 bg-white  border border-gray-100 shadow-2xl overflow-hidden max-w-lg">
+                                
+                                <div class="bg-red-50 px-6 py-5 border-b border-red-100 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-200">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-black text-slate-800 leading-tight">รายละเอียดปัญหา</h3>
+                                            <p class="text-[10px] text-red-500 uppercase font-black tracking-widest">Report Detail</p>
+                                        </div>
+                                    </div>
+                                    <form method="dialog">
+                                        <button class="btn btn-sm btn-circle btn-ghost text-slate-400">✕</button>
+                                    </form>
+                                </div>
+
+                                <div class="p-6">
+                                    <div class="flex items-center gap-3 mb-6 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div class="avatar">
+                                            <div class="w-10 h-10 rounded-full ring-2 ring-white overflow-hidden shadow-sm">
+                                                {% if submission.student.student_profile.profile_image %}
+                                                    <img src="{{ submission.student.student_profile.profile_image.url }}" class="object-cover w-full h-full" />
+                                                {% else %}
+                                                    <div class="bg-red-100 text-red-600 w-full h-full flex items-center justify-center text-xs font-black">
+                                                        {{ submission.student.student_profile.name|slice:":1"|upper }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">ผู้แจ้งปัญหา</p>
+                                            <p class="text-sm font-black text-slate-700">{{ submission.student.student_profile.name }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2 text-slate-500 ml-1">
+                                            <i class="fas fa-quote-left text-xs text-red-300"></i>
+                                            <span class="text-[11px] font-black uppercase tracking-widest">ข้อความที่นักเรียนระบุ</span>
+                                        </div>
+                                        <div class="bg-white p-5 rounded-2xl border-2 border-dashed border-slate-100 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap min-h-[100px]">
+                                            {{ submission.report_reason|default:"(นักเรียนไม่ได้ระบุรายละเอียดเพิ่มเติม)" }}
+                                        </div>
+                                        <div class="flex justify-end mt-1 px-1">
+                                            <span class="text-[10px] text-slate-400 font-medium italic">
+                                                แจ้งเมื่อ: {{ submission.submitted_at|date:"d M Y" }} เวลา {{ submission.submitted_at|date:"H:i" }} น.
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-8 flex items-center gap-3">
+                                        <form method="dialog" class="flex-1">
+                                            <button class="btn btn-ghost w-full rounded-2xl font-black text-slate-400 hover:bg-slate-100">
+                                                ปิด
+                                            </button>
+                                        </form>
+                                        <a href="{% url 'teacher:review_submission' submission.pk %}" 
+                                        class="btn flex-[2] bg-red-600 hover:bg-red-700 text-white border-none rounded-2xl shadow-lg shadow-red-200 gap-2 group">
+                                            <span class="font-black">ตรวจสอบงานนี้</span>
+                                            <i class="fas fa-arrow-right text-xs transition-transform group-hover:translate-x-1"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </dialog>
                         </td>
 
                         <td class="py-4 px-6 text-center text-slate-500 text-sm">
@@ -122,7 +191,6 @@
     .table tr.hover:hover th,
     .table tr.hover:hover td {
         background-color: rgba(254, 242, 242, 0.5);
-        /* สีแดงอ่อนๆ เวลา hover */
     }
 </style>
 {% endblock %}
